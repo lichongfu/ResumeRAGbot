@@ -12,16 +12,20 @@ function jobRoleState_(user, cfg) {
       ['recruiter', 'applicant'].indexOf(value.role) >= 0) return { role: value.role, testing: true };
   return { role: 'applicant', expired: !!value };
 }
-function jobHomeActions_(user, cfg) {
+function jobInterviewActions_(user, cfg) {
   var state = jobRoleState_(user, cfg), actions = state.role === 'applicant' ?
     [contactButton_('待回答職缺', 'jm:list')] :
-    [contactButton_('貼職缺，詢問三題', 'jm:start'), contactButton_('查看回覆與面試問題', 'jm:list')];
+    [contactButton_('選配：請本人補充三題', 'jm:start'), contactButton_('查看回覆與面試問題', 'jm:list')];
   if (user && user === ownerLineUserId_()) {
     actions.push(contactButton_(state.role === 'recruiter' ? '切換為應徵者（測試）' : '模擬人資（本人測試）',
       state.role === 'recruiter' ? 'jm:role:applicant' : 'jm:role:recruiter'));
     if (state.testing) actions.push(contactButton_('結束測試', 'jm:role:exit'));
   }
   return actions;
+}
+function jobHomeActions_(user, cfg) {
+  return [contactButton_('貼職缺，看證據與作品', 'jg:start'), contactButton_('面談準備單', 'jg:resume'),
+    contactButton_('選配：本人三題訪談', 'jm:menu')];
 }
 
 function jobMessage_(text, actions) {
@@ -124,12 +128,14 @@ function handleJobMatch_(event, text, cfg) {
       return jobMessage_(roleCommand === 'exit' ? '已結束測試，回到應徵者本人。測試需求保留，可重新進入測試查看或刪除。' :
         '本人測試｜目前角色：' + (roleCommand === 'recruiter' ? '人資' : '應徵者') +
         '\n兩小時有效。測試需求與正式需求分開顯示；切換時保存草稿及回答，不自動分享。請點下方入口繼續。',
-        jobHomeActions_(user, cfg).map(function (button) { return [button.action.label, button.action.data]; }));
+        jobInterviewActions_(user, cfg).map(function (button) { return [button.action.label, button.action.data]; }));
     }
     if (role.expired) {
       PropertiesService.getScriptProperties().deleteProperty(jobRoleKey_(cfg));
       return done(jobMessage_('本人測試已過期或設定已變更，已回到應徵者身分。剛才的輸入未當成回答，也未交給 AI。請重新輸入「模擬人資」開始測試，或輸入「首頁」。'));
     }
+    if (text === 'jm:menu') return done(jobMessage_('選配：本人三題訪談\n此流程會通知履歷本人回答，需先設定 OWNER_LINE_USER_ID。本人測試可切換角色；主要的證據導覽與準備單不需要切換。',
+      jobInterviewActions_(user, cfg).map(function (button) { return [button.action.label, button.action.data]; })));
     if (navigation) {
       if (active) active.status = 'paused';
       delete data.drafts[actor]; savePortfolioStore_(store, cfg); return null;

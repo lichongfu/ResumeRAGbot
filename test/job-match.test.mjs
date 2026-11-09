@@ -24,7 +24,7 @@ const output = messages => messages.map(m => m.text).join('\n');
 
 for (const mode of [undefined, 'bundle']) test('owner can test both roles with isolated data and explicit sharing: ' + (mode || 'sources'), () => {
   const f = fixture(mode), cfg = f.gas.config_();
-  const labels = user => f.gas.jobHomeActions_(user, cfg).map(b => b.action.data);
+  const labels = user => f.gas.jobInterviewActions_(user, cfg).map(b => b.action.data);
   assert(labels(owner).includes('jm:role:recruiter'));
   assert(!labels(owner).includes('jm:start'));
   assert(!labels('hr').some(x => x.startsWith('jm:role:')));
@@ -86,11 +86,14 @@ test('home uses sender role and active invitation prevents switching roles', () 
   send('首頁');
   let home = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
   let buttons = home.contents.contents[2].footer.contents.map(b => b.action.data);
-  assert(!buttons.includes('jm:start')); assert(buttons.includes('jm:role:recruiter'));
+  assert(!buttons.includes('jm:start')); assert(buttons.includes('jg:start')); assert(buttons.includes('jm:menu'));
   send('模擬人資'); send('首頁');
   home = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
   buttons = home.contents.contents[2].footer.contents.map(b => b.action.data);
-  assert(buttons.includes('jm:start')); assert(buttons.includes('jm:role:applicant'));
+  assert(buttons.includes('jg:start')); assert(buttons.includes('jm:menu'));
+  send('jm:menu');
+  const menu = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
+  assert(menu.quickReply.items.some(item => item.action.data === 'jm:role:applicant'));
   send('留下邀約'); send('結束測試');
   const reply = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
   assert.match(reply.text, /先完成或取消/);
