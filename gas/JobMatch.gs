@@ -1,5 +1,7 @@
 /**
- * 職缺補充訪談：私有 Drive 保存七天；職缺與回答不寫回 Doc、不送模型。
+ * 舊版職缺補充訪談相容程式：candidate.6 起不再由 LINE 路由呼叫。
+ * 保留舊資料格式與回歸檢查，現行主流程使用 JobGuide／JobJourney。
+ * 舊版私有 Drive 保存七天；職缺與回答不寫回 Doc、不送模型。
  * 三題採透明的固定框架，引用人資選定的條件；結果是本人陳述，不是能力評分。
  */
 /** 測試角色只綁定已設定的本人、目前 Doc 與兩小時期限。 */
@@ -24,7 +26,7 @@ function jobInterviewActions_(user, cfg) {
   return actions;
 }
 function jobHomeActions_(user, cfg) {
-  return [contactButton_('繼續上次職缺', 'jg:resume'), contactButton_('更多功能', 'jg:more')];
+  return [contactButton_('我的職缺與訪談', 'jg:resume')];
 }
 
 function jobMessage_(text, actions) {

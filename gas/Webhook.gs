@@ -131,11 +131,8 @@ function handleEvent_(event, cfg) {
     }
     if (text === '看履歷') text = 'topic:' + visibleMenuTopics_()[1].id;
     if (text === '聯繫邀約') text = 'nav:contact';
-    var invitation = invitationDraft_(invitationKey_(event.source.userId, cfg));
     if (!cfg.enabled) messages = [textMessage_('履歷助理目前暫停服務，請稍後再試。')];
     else if ((messages = handleJobGuide_(event, text, cfg))) { /* 職缺證據導覽不需要角色切換。 */ }
-    else if ((!invitation || invitation.step >= 5 || /^jm:role:|^(模擬人資|切回應徵者|結束測試)$/.test(text)) &&
-      (messages = handleJobMatch_(event, text, cfg))) { /* 職缺與私人回答不進一般問答。 */ }
     else if ((messages = handleContact_(event, text, cfg, prepared))) { /* 聯繫與邀約不經 RAG。 */ }
     else if (/^(清除對話|重新開始|reset)$/i.test(text)) {
       clearConversation_(event.source.userId);

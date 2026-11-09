@@ -80,26 +80,26 @@ test('role switches preserve the test recruiter draft and cannot be triggered by
   assert(f.records()[id].testOwner);
 });
 
-test('home uses sender role and active invitation prevents switching roles', () => {
+test('live home uses one journey and legacy role links no longer activate a test mode', () => {
   const f = fixture(), cfg = f.gas.config_(); let n = 0;
   function send(text) { const e = event(text, 'role-web-' + ++n); e.source.userId = owner; f.gas.handleEvent_(e, cfg); }
   send('首頁');
   let home = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
   let buttons = home.contents.contents[2].footer.contents.map(b => b.action.data);
-  assert(!buttons.includes('jm:start')); assert(buttons.includes('jg:more'));
+  assert(!buttons.includes('jm:start')); assert(buttons.includes('jg:resume'));
   assert(home.contents.contents[0].footer.contents.some(b => b.action.data === 'jg:start'));
   send('模擬人資'); send('首頁');
   home = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
   buttons = home.contents.contents[2].footer.contents.map(b => b.action.data);
-  assert(buttons.includes('jg:more'));
+  assert(buttons.includes('jg:resume'));
   assert(home.contents.contents[0].footer.contents.some(b => b.action.data === 'jg:start'));
   send('jm:menu');
   const menu = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
-  assert(menu.quickReply.items.some(item => item.action.data === 'jm:role:applicant'));
+  assert(menu.quickReply.items.some(item => item.action.data === 'jg:start'));
   send('留下邀約'); send('結束測試');
   const reply = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
   assert.match(reply.text, /先完成或取消/);
-  assert.equal(f.gas.jobRoleState_(owner, cfg).role, 'recruiter');
+  assert.equal(f.gas.jobRoleState_(owner, cfg).testing, undefined);
 });
 
 test('postback entry sends a valid LINE reply without an empty quickReply array', () => {
@@ -117,8 +117,9 @@ test('postback entry sends a valid LINE reply without an empty quickReply array'
     };
     assert.equal(f.gas.handleEvent_(e, f.gas.config_()), 'replied');
     const reply = f.state.calls.find(c => c.url.endsWith('/message/reply'));
-    assert.match(reply.body.messages[0].text, /請貼上職缺文字/);
-    assert(!('quickReply' in reply.body.messages[0]));
+    assert.match(reply.body.messages[0].text, /貼上職缺/);
+    assert(reply.body.messages[0].quickReply.items.length > 0);
+    assert(!('quickReply' in f.gas.jobMessage_('沒有操作按鈕')[0]));
     const withActions = f.gas.jobMessage_('test', [['取消', 'jm:cancel-draft']]);
     assert.equal(withActions[0].quickReply.items.length, 1);
   }
@@ -198,9 +199,9 @@ test('expiry removes private data, unavailable notifications are honest, missing
 test('webhook routes long job input to private flow, and existing invitations retain priority', () => {
   const f = fixture(); let n = 0;
   const send = (user, text) => { const e = event(text, 'web-' + ++n); e.source.userId = user; return f.gas.handleEvent_(e, f.gas.config_()); };
-  send('hr', '職缺對照'); send('hr', 'Python '.repeat(200));
-  const d = f.gas.loadPortfolioStore_(f.gas.config_()).jobMatch.drafts[f.gas.invitationVisitor_('hr')];
-  assert.equal(d.step, 'focus'); assert.equal(f.state.documentWrites, 0);
+  send('hr', '職缺對照'); send('hr', '職缺：AI工程師\n工作內容：' + 'Python '.repeat(200));
+  const d = f.gas.guideRead_('hr', f.gas.config_());
+  assert(d.job.length > 800); assert.equal(d.stage, 'extract'); assert.equal(f.state.documentWrites, 0);
   send('hr', '首頁'); send('hr', '留下邀約'); send('hr', '測試公司');
   const invitation = f.gas.invitationDraft_(f.gas.invitationKey_('hr', f.gas.config_()));
   assert.equal(invitation.step, 1);
