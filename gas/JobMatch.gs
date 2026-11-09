@@ -24,8 +24,7 @@ function jobInterviewActions_(user, cfg) {
   return actions;
 }
 function jobHomeActions_(user, cfg) {
-  return [contactButton_('貼職缺，看證據與作品', 'jg:start'), contactButton_('面談準備單', 'jg:resume'),
-    contactButton_('選配：本人三題訪談', 'jm:menu')];
+  return [contactButton_('繼續上次職缺', 'jg:resume'), contactButton_('更多功能', 'jg:more')];
 }
 
 function jobMessage_(text, actions) {

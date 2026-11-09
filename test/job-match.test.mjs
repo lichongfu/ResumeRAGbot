@@ -86,11 +86,13 @@ test('home uses sender role and active invitation prevents switching roles', () 
   send('首頁');
   let home = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
   let buttons = home.contents.contents[2].footer.contents.map(b => b.action.data);
-  assert(!buttons.includes('jm:start')); assert(buttons.includes('jg:start')); assert(buttons.includes('jm:menu'));
+  assert(!buttons.includes('jm:start')); assert(buttons.includes('jg:more'));
+  assert(home.contents.contents[0].footer.contents.some(b => b.action.data === 'jg:start'));
   send('模擬人資'); send('首頁');
   home = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
   buttons = home.contents.contents[2].footer.contents.map(b => b.action.data);
-  assert(buttons.includes('jg:start')); assert(buttons.includes('jm:menu'));
+  assert(buttons.includes('jg:more'));
+  assert(home.contents.contents[0].footer.contents.some(b => b.action.data === 'jg:start'));
   send('jm:menu');
   const menu = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
   assert(menu.quickReply.items.some(item => item.action.data === 'jm:role:applicant'));

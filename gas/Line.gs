@@ -159,7 +159,8 @@ function welcomeMessage_(cfg, prepared, userId) {
   }
   var compactButton = function (topic) { return { type: 'button', height: 'sm', style: 'link', color: '#23735B', action: action(topic) }; };
   return { type: 'flex', altText: Array.from(name).slice(0,50).join('') + '｜認識我・個人特質・履歷導覽', quickReply: quickReply_(), contents: { type: 'carousel', contents: [
-    card('01', 'HELLO / 認識我', identity, [contactButton_('聯繫本人', 'nav:contact')]),
+    card('01', 'HELLO / 認識我', identity, [contactButton_('看履歷', 'topic:' + buttons[1].id),
+      contactButton_('貼職缺', 'jg:start'), contactButton_('聯繫邀約', 'nav:contact')]),
     card('02', 'ABOUT / 個人特質', traits, [compactButton(buttons[1])]),
     card('03', 'EXPLORE / 履歷導覽', navigation, [{ type: 'button', height: 'sm', style: 'link', color: '#23735B', action: { type: 'postback', label: '回首頁', data: 'nav:home', displayText: '首頁' } }].concat(jobHomeActions_(userId, cfg)))
   ] } };

@@ -129,6 +129,8 @@ function handleEvent_(event, cfg) {
           prepared = { index: currentIndex, source: currentSource }; }
       } catch (_) { MESSAGE_TOPICS_ = []; }
     }
+    if (text === '看履歷') text = 'topic:' + visibleMenuTopics_()[1].id;
+    if (text === '聯繫邀約') text = 'nav:contact';
     var invitation = invitationDraft_(invitationKey_(event.source.userId, cfg));
     if (!cfg.enabled) messages = [textMessage_('履歷助理目前暫停服務，請稍後再試。')];
     else if ((messages = handleJobGuide_(event, text, cfg))) { /* 職缺證據導覽不需要角色切換。 */ }

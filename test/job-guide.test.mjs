@@ -142,7 +142,8 @@ test('webhook exposes the primary flow to the owner without switching or notific
       return f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages;
     }
     const home = send('首頁')[0];
-    assert(home.contents.contents[2].footer.contents.some(b => b.action.data === 'jg:start'));
+    assert(home.contents.contents[0].footer.contents.some(b => b.action.data === 'jg:start'));
+    assert.deepEqual([...home.contents.contents[0].footer.contents.map(b => b.action.label)], ['看履歷', '貼職缺', '聯繫邀約']);
     assert.match(output(send('jg:start')), /不需要角色切換/);
     assert.match(output(send(job)), /職缺條件確認/);
     const s = f.gas.guideRead_('user-1', f.gas.config_());
@@ -173,4 +174,52 @@ test('replayed input and confirm events do not repeat extraction or advance anot
   f.step('jg:job:' + s.id);
   assert.match(output(f.step(job, 'hr', 'input-once')), /未覆蓋目前內容/);
   assert.equal(f.read().stage, 'input');
+});
+
+for (const mode of [undefined, 'bundle']) test('summary first with evidence details and invitation handoff: ' + (mode || 'sources'), () => {
+  const f = fixture(mode), s = f.finish();
+  const summary = f.step('jg:resume');
+  assert.equal(summary.length, 1); assert.match(output(summary), /職缺重點摘要/);
+  assert.match(output(summary), /有相關原文 2 項／待確認 1 項／尚未比對 0 項/);
+  assert(!output(summary).includes('面談追問：'));
+  assert(summary[0].quickReply.items.some(item => item.action.data === 'jg:invite:' + s.id));
+  assert.match(output(f.step('jg:report:' + s.id)), /面談追問：/);
+  assert.match(output(f.step('jg:invite:' + s.id, 'other')), /沒有有效準備單/);
+  assert.match(output(f.step('jg:invite:' + s.id)), /公司／單位與您的稱呼/);
+  assert.equal(f.read().paused, true);
+  assert(!f.state.calls.some(call => call.url.endsWith('/push')));
+  const e = event('測試公司，王小姐', 'handoff-company'); e.source.userId = 'hr';
+  f.gas.handleEvent_(e, f.gas.config_());
+  const key = f.gas.invitationKey_('hr', f.gas.config_());
+  assert.equal(f.gas.invitationDraft_(key).fields.company, '測試公司，王小姐');
+  f.step('jg:invite:' + s.id);
+  assert.equal(f.gas.invitationDraft_(key).step, 1, 'reopening invitation must preserve already entered fields');
+});
+
+test('summary revalidates source and other operations can delete stale preparation sheets', () => {
+  const f = fixture(), s = f.finish();
+  f.state.text = text.replace('Python', 'JavaScript');
+  assert.match(output(f.step('jg:summary:' + s.id)), /履歷來源已更動/);
+  assert.match(output(f.step('jg:next:' + s.id + ':' + s.requirements[0].id)), /履歷來源已更動/);
+  assert.match(output(f.step('jg:options:' + s.id)), /其他操作/);
+  assert.match(output(f.step('jg:delete:' + s.id)), /已刪除/); assert.equal(f.read(), null);
+});
+
+test('primary text labels route consistently with buttons and advanced features stay in more menu', () => {
+  const f = fixture(); let n = 0;
+  function send(text) {
+    const e = event(text, 'main-label-' + ++n); e.source.userId = 'hr';
+    f.gas.handleEvent_(e, f.gas.config_());
+    return f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages;
+  }
+  assert.match(output(send('貼職缺')), /第 1 步/);
+  assert.match(output(send('更多功能')), /更多功能/);
+  const more = send('更多功能')[0];
+  assert(more.quickReply.items.some(item => item.action.data === 'jm:menu'));
+  assert.match(output(send('聯繫邀約')), /聯繫本人/);
+  f.gas.answerLineConversation_ = function (question, cfg, original, user, focus, gallery, topicId) {
+    assert.equal(topicId, f.gas.visibleMenuTopics_()[1].id);
+    return { messages: [{ type: 'text', text: '履歷概覽' }] };
+  };
+  assert.match(output(send('看履歷')), /履歷概覽/);
 });

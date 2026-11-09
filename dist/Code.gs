@@ -42,7 +42,7 @@ function config_() {
 /**
  * 目前程式版本；發布時須與 package.json、學生安裝包及正式部署一致。
  */
-function appVersion_() { return '3.0.0-candidate.4'; }
+function appVersion_() { return '3.0.0-candidate.5'; }
 
 /**
  * 接受原始文件 ID 或一般 Google Docs 網址，統一取得文件 ID。
@@ -1962,7 +1962,8 @@ function welcomeMessage_(cfg, prepared, userId) {
   }
   var compactButton = function (topic) { return { type: 'button', height: 'sm', style: 'link', color: '#23735B', action: action(topic) }; };
   return { type: 'flex', altText: Array.from(name).slice(0,50).join('') + '｜認識我・個人特質・履歷導覽', quickReply: quickReply_(), contents: { type: 'carousel', contents: [
-    card('01', 'HELLO / 認識我', identity, [contactButton_('聯繫本人', 'nav:contact')]),
+    card('01', 'HELLO / 認識我', identity, [contactButton_('看履歷', 'topic:' + buttons[1].id),
+      contactButton_('貼職缺', 'jg:start'), contactButton_('聯繫邀約', 'nav:contact')]),
     card('02', 'ABOUT / 個人特質', traits, [compactButton(buttons[1])]),
     card('03', 'EXPLORE / 履歷導覽', navigation, [{ type: 'button', height: 'sm', style: 'link', color: '#23735B', action: { type: 'postback', label: '回首頁', data: 'nav:home', displayText: '首頁' } }].concat(jobHomeActions_(userId, cfg)))
   ] } };
@@ -2438,8 +2439,7 @@ function jobInterviewActions_(user, cfg) {
   return actions;
 }
 function jobHomeActions_(user, cfg) {
-  return [contactButton_('貼職缺，看證據與作品', 'jg:start'), contactButton_('面談準備單', 'jg:resume'),
-    contactButton_('選配：本人三題訪談', 'jm:menu')];
+  return [contactButton_('繼續上次職缺', 'jg:resume'), contactButton_('更多功能', 'jg:more')];
 }
 
 function jobMessage_(text, actions) {
@@ -2671,9 +2671,10 @@ function guideActions_(s) {
   var actions = [];
   if (s.stage === 'review') actions.push(['確認條件，開始比對', 'jg:compare:' + s.id]);
   else if (s.stage === 'extract') actions.push(['重試整理條件', 'jg:extract:' + s.id]);
-  else if (missing) actions.push(['繼續比對下一項', 'jg:next:' + s.id + ':' + missing.id]);
-  if (s.fingerprint) actions.push(['查看面談準備單', 'jg:report:' + s.id], ['查看相關作品', 'jg:works:' + s.id]);
-  actions.push(['重新貼職缺', 'jg:job:' + s.id], ['離開', 'jg:leave:' + s.id]);
+  else if (missing) actions.push(['繼續比對（' + Object.keys(s.results).length + '/' + s.requirements.length + '）', 'jg:next:' + s.id + ':' + missing.id]);
+  if (s.fingerprint) actions.push(['重點摘要', 'jg:summary:' + s.id], ['完整證據與準備單', 'jg:report:' + s.id],
+    ['相關作品', 'jg:works:' + s.id], ['留下邀約', 'jg:invite:' + s.id], ['其他操作', 'jg:options:' + s.id]);
+  else actions.push(['重新貼職缺', 'jg:job:' + s.id], ['離開', 'jg:leave:' + s.id]);
   return actions;
 }
 function guideReview_(s) {
@@ -2759,6 +2760,27 @@ function guideProgress_(s) {
   return jobMessage_('已比對 ' + count + ' / ' + s.requirements.length + ' 項。\n每次處理一項，避免長時間等待。' +
     (count === s.requirements.length ? '\n可查看面談準備單與相關作品。' : '\n請繼續下一項；準備單會標示尚未處理的條件。'), guideActions_(s));
 }
+/** 先給重點，不把有引用的項目數誤稱為符合率。 */
+function guideSummary_(s) {
+  var found = 0, missing = 0, pending = 0, excerpts = [];
+  var lines = s.requirements.map(function (r, i) {
+    var result = s.results[r.id], status;
+    if (!result) { pending++; status = '尚未比對'; }
+    else if (!result.evidence.length) { missing++; status = '待確認'; }
+    else {
+      found++; status = '有相關原文';
+      result.evidence.forEach(function (e) {
+        if (excerpts.length < 2 && !excerpts.some(function (old) { return old.section === e.section; })) excerpts.push(e);
+      });
+    }
+    return (i + 1) + '. ' + r.quote.slice(0, 60) + (r.quote.length > 60 ? '…' : '') + '｜' + status;
+  });
+  return jobMessage_('職缺重點摘要' + (pending ? '（比對進行中）' : '') + '\n' + s.job.split('\n')[0].slice(0, 80) +
+    '\n\n' + lines.join('\n') + '\n\n有相關原文 ' + found + ' 項／待確認 ' + missing + ' 項／尚未比對 ' + pending + ' 項。這是資料整理數量，不是能力分數或符合率。' +
+    (excerpts.length ? '\n\n值得先看的資料：\n' + excerpts.map(function (e) {
+      return '• ' + e.section + '：「' + e.quote.slice(0, 90) + (e.quote.length > 90 ? '…' : '') + '」' + (e.imageKey ? '（圖片觀察）' : '');
+    }).join('\n') : '') + '\n\n可展開原文證據與面談追問、看相關作品，或留下邀約。未記載不代表不具備能力。', guideActions_(s));
+}
 function guideReportText_(s) {
   return '職缺專屬面談準備單\n職缺：' + s.job.split('\n')[0].slice(0, 100) + '\n整理時間：' + Utilities.formatDate(new Date(s.updatedAt), 'Asia/Taipei', 'yyyy-MM-dd HH:mm') + '（台北時間）' +
     '\n範圍：人資已確認的 ' + s.requirements.length + ' 項條件；已比對 ' + Object.keys(s.results).length + ' 項。\n\n' +
@@ -2792,6 +2814,10 @@ function guideRun_(user, cfg, id, task, requirementId) {
   if (snapshot.busy) return jobMessage_('這份職缺正在處理，請稍後點「繼續目前職缺」。', [['繼續目前職缺', 'jg:resume']]);
   if (snapshot.unchanged) {
     if (!snapshot.unchanged.requirements) return jobMessage_('請先貼完整職缺，或重試整理條件。', guideActions_(snapshot.unchanged));
+    if (snapshot.unchanged.fingerprint) {
+      try { guideSource_(cfg, snapshot.unchanged.fingerprint); } catch (e) { return guideError_(e, snapshot.unchanged); }
+      if (Object.keys(snapshot.unchanged.results).length === snapshot.unchanged.requirements.length) return guideSummary_(snapshot.unchanged);
+    }
     return snapshot.unchanged.stage === 'review' ? guideReview_(snapshot.unchanged) : guideProgress_(snapshot.unchanged);
   }
   var result, error;
@@ -2817,13 +2843,13 @@ function guideRun_(user, cfg, id, task, requirementId) {
   if (error) return guideError_(error, saved);
   if (task !== 'extract') { try { guideSource_(cfg, saved.fingerprint); } catch (e) { return guideError_(e, saved); } }
   return task === 'extract' ? guideReview_(saved) :
-    Object.keys(saved.results).length === saved.requirements.length ? guideReport_(saved) : guideProgress_(saved);
+    Object.keys(saved.results).length === saved.requirements.length ? guideSummary_(saved) : guideProgress_(saved);
 }
 
 function handleJobGuide_(event, text, cfg) {
-  var user = event.source.userId, command = /^jg:(extract|job|remove|compare|next|report|works|leave):([a-f0-9]{16})(?::([a-f0-9]{12}))?$/.exec(text);
-  var start = text === 'jg:start' || text === '職缺證據導覽', resume = text === 'jg:resume' || text === '面談準備單';
-  var explicit = start || resume || /^jg:/.test(text), s;
+  var user = event.source.userId, command = /^jg:(extract|job|remove|compare|next|summary|report|works|invite|options|jobtext|info|example|delete|leave):([a-f0-9]{16})(?::([a-f0-9]{12}))?$/.exec(text);
+  var start = text === 'jg:start' || text === '職缺證據導覽' || text === '貼職缺', resume = text === 'jg:resume' || text === '面談準備單' || text === '繼續上次職缺';
+  var explicit = start || resume || text === '更多功能' || /^jg:/.test(text), s;
   try {
     s = guideRead_(user, cfg);
     if (s && s.expired) {
@@ -2832,7 +2858,13 @@ function handleJobGuide_(event, text, cfg) {
     }
     if (!explicit && (!s || s.paused && (s.inputEvents || []).indexOf(eventKey_(event)) < 0)) return null;
     var invitation = invitationDraft_(invitationKey_(user, cfg));
-    if (invitation && invitation.step < 5) return explicit ? jobMessage_('請先完成或取消邀約表單，再開啟職缺證據導覽。') : null;
+    if (invitation && invitation.step < 5) {
+      if (command && command[1] === 'invite' && s && s.id === command[2])
+        return invitation.step < 4 ? invitationPrompt_(invitation) : invitationConfirmation_(invitation);
+      return explicit ? jobMessage_('請先完成或取消邀約表單，再開啟職缺證據導覽。') : null;
+    }
+    if (text === 'jg:more' || text === '更多功能') return jobMessage_('更多功能\n可繼續上次職缺，或請本人補充三題。一般職缺比對不需要切換角色。',
+      [['繼續上次職缺', 'jg:resume'], ['選配：本人三題訪談', 'jm:menu'], ['回首頁', 'nav:home']]);
     var navigation = /^(首頁|回首頁|選單|nav:home|取消|清除對話|重新開始|reset|聯繫本人|留下邀約|模擬人資|切回應徵者|結束測試|使用說明|說明|help|隱私|privacy)$/.test(text) || /^(?:jm:|invite:|topic:|work:|contact:|nav:contact)/.test(text);
     if (!explicit && navigation) {
       guideChange_(user, cfg, function (rows, actor) {
@@ -2847,18 +2879,32 @@ function handleJobGuide_(event, text, cfg) {
         if (!rows[actor] && Object.keys(rows).length >= 30) return false;
         var history = rows[actor] && rows[actor].inputEvents || [];
         rows[actor] = { id: sha256_(Utilities.getUuid()).slice(0, 16), stage: 'input', expiresAt: Date.now() + 86400000, updatedAt: Date.now(), results: {}, inputEvents: history };
-        return true;
+        return rows[actor];
       });
-      return jobMessage_(created ? '職缺證據導覽｜第 1 步：貼上職缺\n\n請貼職稱、工作內容與條件（最多 4000 字）。例如：\n職缺：AI工程師\n工作內容：使用 Python 開發 AI 應用、串接 API\n必要條件：具備 Python 專案經驗\n加分條件：使用過 GAS\n\n系統會先整理條件讓你確認，再逐項搜尋公開履歷與作品，產生可複製的面談準備單。這個流程不需要角色切換或本人通知設定。\n\n職缺與檢索片段會送至 Gemini；準備單存於本人私人 Drive，24 小時後不可查閱，於下次使用本流程時清除。請勿貼機密資料。不寫回履歷、不寄信或推播。輸入「取消」刪除。' : '目前使用人數較多，請稍後再試。');
+      return created ? jobMessage_('第 1 步：貼上完整職缺\n\n請貼職稱、工作內容與條件，20～4000 字；不能只有職稱或網址。\n\n接著確認條件、查看證據與作品，最後取得面談準備單。不需要角色切換。\n\n職缺與相關公開資料會送至 Gemini，準備單私人保存 24 小時。請勿貼機密資料；輸入「取消」可刪除。',
+        [['看職缺範例', 'jg:example:' + created.id], ['資料使用說明', 'jg:info:' + created.id], ['回首頁', 'nav:home']]) : jobMessage_('目前使用人數較多，請稍後再試。');
     }
     if (!s) return explicit ? jobMessage_('目前沒有有效準備單，請先貼職缺。', [['貼職缺，看證據與作品', 'jg:start']]) : null;
     if (!explicit && (s.inputEvents || []).indexOf(eventKey_(event)) >= 0) {
       if (s.lastInputEvent !== eventKey_(event)) return jobMessage_('這是先前已處理的職缺訊息，未覆蓋目前內容。', [['繼續目前職缺', 'jg:resume']]);
       if (s.stage === 'review') return guideReview_(s);
       if (s.stage === 'extract') return guideRun_(user, cfg, s.id, 'extract');
-      if (s.fingerprint) { guideSource_(cfg, s.fingerprint); return guideReport_(s); }
+      if (s.fingerprint) { guideSource_(cfg, s.fingerprint); return guideSummary_(s); }
     }
     if (command && s.id !== command[2]) return jobMessage_('這張卡片對應的舊職缺已失效，請開啟目前職缺。', [['繼續目前職缺', 'jg:resume']]);
+    if (command && command[1] === 'delete') {
+      guideChange_(user, cfg, function (rows, actor) { delete rows[actor]; });
+      return jobMessage_('已刪除目前職缺與準備單。已傳出的 LINE 訊息或自行複製內容無法收回。', [['回首頁', 'nav:home']]);
+    }
+    if (command && command[1] === 'example') return jobMessage_('請參考這個格式，貼上自己的完整職缺：\n\n職缺：AI工程師\n工作內容：使用 Python 開發 AI 應用，串接 API。\n必要條件：具備 Python 專案經驗。\n加分條件：使用過 Google Apps Script。');
+    if (command && command[1] === 'info') return jobMessage_('職缺及少量檢索片段會送至 Gemini，結果需經引用核對。準備單保存在履歷本人的私人 Drive，各訪客分開存取；24 小時後不可查閱，後續使用時清理。\n不寫回履歷，不自動寄信、推播或送出邀約。履歷變更後需要重新同步並比對。已傳出的訊息無法收回。', [['繼續目前職缺', 'jg:resume']]);
+    if (command && command[1] === 'options') return jobMessage_('其他操作',
+      [['查看原職缺', 'jg:jobtext:' + s.id], ['重新貼職缺', 'jg:job:' + s.id], ['資料使用說明', 'jg:info:' + s.id], ['刪除準備單', 'jg:delete:' + s.id], ['離開', 'jg:leave:' + s.id]]);
+    if (command && command[1] === 'jobtext') return jobMessage_(s.job || '尚未貼上職缺。', [['繼續目前職缺', 'jg:resume']]);
+    if (command && command[1] === 'invite') {
+      guideChange_(user, cfg, function (rows, actor) { rows[actor].paused = true; delete rows[actor].lease; delete rows[actor].busyUntil; });
+      return handleContact_(event, 'invite:start', cfg, null);
+    }
     if (command && command[1] === 'leave') {
       guideChange_(user, cfg, function (rows, actor) { rows[actor].paused = true; delete rows[actor].lease; delete rows[actor].busyUntil; });
       return jobMessage_('已離開，準備單保留至到期。可輸入「面談準備單」繼續；如需刪除，請開啟後輸入「取消」。');
@@ -2883,9 +2929,10 @@ function handleJobGuide_(event, text, cfg) {
     }
     if (command && command[1] === 'next') return guideRun_(user, cfg, s.id, 'next', command[3]);
     if (command && command[1] === 'extract') return guideRun_(user, cfg, s.id, 'extract');
-    if (command && ['report', 'works'].indexOf(command[1]) >= 0) {
+    if (command && ['summary', 'report', 'works'].indexOf(command[1]) >= 0) {
       if (!s.fingerprint) return s.requirements ? guideReview_(s) : jobMessage_('請先貼完整職缺並確認條件。', guideActions_(s));
       var prepared = guideSource_(cfg, s.fingerprint);
+      if (command[1] === 'summary') return guideSummary_(s);
       if (command[1] === 'report') return guideReport_(s);
       var citations = [].concat.apply([], Object.keys(s.results).map(function (key) { return s.results[key].evidence; }));
       var keys = (prepared.index.imageSources || []).filter(function (image) {
@@ -2901,7 +2948,7 @@ function handleJobGuide_(event, text, cfg) {
     }
     if (resume) {
       s = guideChange_(user, cfg, function (rows, actor) { rows[actor].paused = false; return rows[actor]; });
-      if (s.fingerprint) { guideSource_(cfg, s.fingerprint); return guideReport_(s); }
+      if (s.fingerprint) { guideSource_(cfg, s.fingerprint); return guideSummary_(s); }
       if (s.stage === 'review') return guideReview_(s);
       return jobMessage_(s.stage === 'input' ? '請貼完整職缺文字，包含工作內容與條件，最多 4000 字。' : '上次整理未完成，可重試或重新貼職缺。', guideActions_(s));
     }
@@ -3390,6 +3437,8 @@ function handleEvent_(event, cfg) {
           prepared = { index: currentIndex, source: currentSource }; }
       } catch (_) { MESSAGE_TOPICS_ = []; }
     }
+    if (text === '看履歷') text = 'topic:' + visibleMenuTopics_()[1].id;
+    if (text === '聯繫邀約') text = 'nav:contact';
     var invitation = invitationDraft_(invitationKey_(event.source.userId, cfg));
     if (!cfg.enabled) messages = [textMessage_('履歷助理目前暫停服務，請稍後再試。')];
     else if ((messages = handleJobGuide_(event, text, cfg))) { /* 職缺證據導覽不需要角色切換。 */ }
