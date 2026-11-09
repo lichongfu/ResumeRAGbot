@@ -1,0 +1,105 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createGas, event } from './harness.mjs';
+
+const owner = 'U' + '1'.repeat(32);
+function fixture(mode) {
+  const f = createGas({ sourceMode: mode, properties: { OWNER_LINE_USER_ID: owner } });
+  let n = 0;
+  f.step = (user, text, id) => {
+    const e = event(text, id || 'job-' + ++n); e.source.userId = user;
+    if (text.startsWith('jm:')) { e.type = 'postback'; e.postback = { data: text }; }
+    return f.gas.handleJobMatch_(e, text, f.gas.config_());
+  };
+  f.records = () => f.gas.loadPortfolioStore_(f.gas.config_()).jobMatch.records;
+  f.submit = (user = 'hr') => {
+    f.step(user, '職缺對照'); f.step(user, '資料分析助理\n必要：Python\n加分：SQL');
+    f.step(user, '必要：Python');
+    const draft = f.gas.loadPortfolioStore_(f.gas.config_()).jobMatch.drafts[f.gas.invitationVisitor_(user)];
+    f.step(user, 'jm:submit:' + draft.id); return draft.id;
+  };
+  return f;
+}
+const output = messages => messages.map(m => m.text).join('\n');
+
+for (const mode of [undefined, 'bundle']) test('private three-question workflow with explicit sharing: ' + (mode || 'sources'), () => {
+  const f = fixture(mode), id = f.submit();
+  assert.equal(f.records()[id].status, 'waiting');
+  assert.equal(f.state.calls.filter(c => c.url.endsWith('/push')).length, 1);
+  assert.match(output(f.step('other-hr', 'jm:view:' + id)), /找不到/);
+  assert.match(output(f.step('hr', 'jm:answer:' + id)), /僅限/);
+  assert.match(output(f.step(owner, 'jm:answer:' + id)), /第 1 \/ 3/);
+  assert.match(output(f.step(owner, '我負責清理資料', 'same-answer')), /第 2 \/ 3/);
+  assert.match(output(f.step(owner, '我負責清理資料', 'same-answer')), /第 2 \/ 3/);
+  assert.equal(f.records()[id].answers.length, 1);
+  f.step(owner, '使用檢查表核對結果');
+  assert.match(output(f.step(owner, '希望有人協助熟悉業務', 'final-answer')), /分享前確認/);
+  assert.match(output(f.step(owner, '希望有人協助熟悉業務', 'final-answer')), /分享前確認/);
+  assert.match(output(f.step(owner, '我還想修改')), /分享前確認/);
+  assert.equal(f.records()[id].answers.length, 3);
+  assert(!output(f.step('hr', 'jm:view:' + id)).includes('我負責清理資料'));
+  f.step(owner, 'jm:share:' + id);
+  const result = output(f.step('hr', 'jm:view:' + id));
+  assert.match(result, /我負責清理資料/); assert.match(result, /正式面試額外追問/);
+  assert.match(result, /尚未驗證/);
+  assert.equal(f.state.documentWrites, 0);
+  assert(!f.state.calls.some(c => c.url.includes('googleapis')));
+  assert(!JSON.stringify(f.records()).includes('"visitor":"hr"'));
+});
+
+test('long jobs, focus verification, old buttons, skip, restart and deletion', () => {
+  const f = fixture(); f.step('hr', '職缺對照');
+  assert.match(output(f.step('hr', 'x'.repeat(4001))), /最多 4000/);
+  assert.match(output(f.step('hr', 'https://example.test/job')), /完整職缺/);
+  f.step('hr', 'Python 開發，SQL 加分');
+  assert.match(output(f.step('hr', '管理十人團隊')), /複製職缺原文/);
+  f.step('hr', 'SQL 加分');
+  const draft = f.gas.loadPortfolioStore_(f.gas.config_()).jobMatch.drafts[f.gas.invitationVisitor_('hr')];
+  const id = draft.id; f.step('hr', 'jm:submit:' + id, 'submit-once');
+  f.step('hr', 'jm:submit:' + id, 'submit-once');
+  assert.equal(f.state.calls.filter(c => c.url.endsWith('/push')).length, 1);
+  f.step(owner, 'jm:answer:' + id);
+  assert.match(output(f.step(owner, 'x'.repeat(801))), /最多 800/);
+  f.step(owner, 'jm:skip:' + id + ':0');
+  f.step(owner, 'jm:skip:' + id + ':0');
+  assert.equal(f.records()[id].answers.length, 1);
+  f.step(owner, '第二題'); f.step(owner, '第三題');
+  f.step(owner, 'jm:restart:' + id); assert.equal(f.records()[id].answers.length, 0);
+  f.step(owner, '取消'); assert.equal(Object.keys(f.records()).length, 0);
+  assert.match(output(f.step('hr', 'jm:view:' + id)), /找不到/);
+});
+
+test('multiple recruiters remain isolated and pausing preserves answers without eating navigation', () => {
+  const f = fixture(), a = f.submit('hr-a'), b = f.submit('hr-b');
+  f.step(owner, 'jm:answer:' + a); f.step(owner, 'a 的回答');
+  f.step(owner, 'jm:answer:' + b);
+  assert.equal(f.records()[a].status, 'paused');
+  assert.equal(f.step(owner, 'nav:home'), null);
+  assert.equal(f.records()[b].status, 'paused');
+  f.step(owner, 'jm:answer:' + a); assert.equal(f.records()[a].answers.length, 1);
+  assert.match(output(f.step('hr-b', 'jm:job:' + a)), /找不到/);
+});
+
+test('expiry removes private data, unavailable notifications are honest, missing owner blocks submissions', () => {
+  const f = fixture(), id = f.submit();
+  f.gas.updatePortfolioStore_(f.gas.config_(), store => { store.jobMatch.records[id].expiresAt = 1; });
+  assert.match(output(f.step('hr', 'jm:view:' + id)), /找不到/);
+  assert.equal(Object.keys(f.records()).length, 0);
+  f.state.properties.delete('OWNER_LINE_USER_ID');
+  assert.match(output(f.step('hr', '職缺對照')), /尚未設定/);
+  const g = fixture(); g.state.response = call => call.url.endsWith('/push') ? { status: 429 } : { body: {} };
+  const other = g.submit();
+  assert.match(output(g.step('hr', 'jm:view:' + other)), /quota_or_rate_limit/);
+  assert.equal(g.records()[other].status, 'waiting');
+});
+
+test('webhook routes long job input to private flow, and existing invitations retain priority', () => {
+  const f = fixture(); let n = 0;
+  const send = (user, text) => { const e = event(text, 'web-' + ++n); e.source.userId = user; return f.gas.handleEvent_(e, f.gas.config_()); };
+  send('hr', '職缺對照'); send('hr', 'Python '.repeat(200));
+  const d = f.gas.loadPortfolioStore_(f.gas.config_()).jobMatch.drafts[f.gas.invitationVisitor_('hr')];
+  assert.equal(d.step, 'focus'); assert.equal(f.state.documentWrites, 0);
+  send('hr', '首頁'); send('hr', '留下邀約'); send('hr', '測試公司');
+  const invitation = f.gas.invitationDraft_(f.gas.invitationKey_('hr', f.gas.config_()));
+  assert.equal(invitation.step, 1);
+});

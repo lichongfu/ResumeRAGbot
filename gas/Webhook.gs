@@ -130,6 +130,8 @@ function handleEvent_(event, cfg) {
       } catch (_) { MESSAGE_TOPICS_ = []; }
     }
     if (!cfg.enabled) messages = [textMessage_('履歷助理目前暫停服務，請稍後再試。')];
+    else if (!invitationDraft_(invitationKey_(event.source.userId, cfg)) &&
+      (messages = handleJobMatch_(event, text, cfg))) { /* 職缺與私人回答不進一般問答。 */ }
     else if ((messages = handleContact_(event, text, cfg, prepared))) { /* 聯繫與邀約不經 RAG。 */ }
     else if (/^(清除對話|重新開始|reset)$/i.test(text)) {
       clearConversation_(event.source.userId);
