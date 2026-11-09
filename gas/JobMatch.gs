@@ -2,6 +2,28 @@
  * 職缺補充訪談：私有 Drive 保存七天；職缺與回答不寫回 Doc、不送模型。
  * 三題採透明的固定框架，引用人資選定的條件；結果是本人陳述，不是能力評分。
  */
+/** 測試角色只綁定已設定的本人、目前 Doc 與兩小時期限。 */
+function jobRoleKey_(cfg) { return 'JOB_TEST_ROLE_' + sha256_(cfg.docId).slice(0, 16); }
+function jobRoleState_(user, cfg) {
+  if (!user || user !== ownerLineUserId_()) return { role: 'recruiter' };
+  var value;
+  try { value = JSON.parse(PropertiesService.getScriptProperties().getProperty(jobRoleKey_(cfg)) || 'null'); } catch (_) {}
+  if (value && value.owner === invitationVisitor_(user) && value.expiresAt > Date.now() &&
+      ['recruiter', 'applicant'].indexOf(value.role) >= 0) return { role: value.role, testing: true };
+  return { role: 'applicant', expired: !!value };
+}
+function jobHomeActions_(user, cfg) {
+  var state = jobRoleState_(user, cfg), actions = state.role === 'applicant' ?
+    [contactButton_('待回答職缺', 'jm:list')] :
+    [contactButton_('貼職缺，詢問三題', 'jm:start'), contactButton_('查看回覆與面試問題', 'jm:list')];
+  if (user && user === ownerLineUserId_()) {
+    actions.push(contactButton_(state.role === 'recruiter' ? '切換為應徵者（測試）' : '模擬人資（本人測試）',
+      state.role === 'recruiter' ? 'jm:role:applicant' : 'jm:role:recruiter'));
+    if (state.testing) actions.push(contactButton_('結束測試', 'jm:role:exit'));
+  }
+  return actions;
+}
+
 function jobMessage_(text, actions) {
   var message = textMessage_(text);
   delete message.quickReply;
@@ -48,8 +70,13 @@ function jobResult_(r) {
 
 /** 每個變更先保存結果，LINE 回覆失敗重送同一事件時不會吃掉下一題。 */
 function handleJobMatch_(event, text, cfg) {
-  var user = event.source.userId, actor = invitationVisitor_(user), owner = ownerLineUserId_();
-  var explicit = /^(jm:|職缺對照$|我的職缺$|待回答職缺$)/.test(text);
+  var user = event.source.userId, owner = ownerLineUserId_(), role = jobRoleState_(user, cfg);
+  var asApplicant = user === owner && role.role === 'applicant';
+  var actor = invitationVisitor_(user === owner && role.testing && role.role === 'recruiter' ? user + ':job-test:' + cfg.docId : user);
+  var roleCommand = /^(模擬人資|切回應徵者|結束測試)$/.test(text) ?
+    { '模擬人資': 'recruiter', '切回應徵者': 'applicant', '結束測試': 'exit' }[text] :
+    (/^jm:role:(recruiter|applicant|exit)$/.exec(text) || [])[1];
+  var explicit = !!roleCommand || /^(jm:|職缺對照$|我的職缺$|待回答職缺$)/.test(text);
   // 邀約流程優先；回首頁可暫停，新的邀約不可被答案流程誤吃。
   var navigation = /^(?:首頁|選單|回首頁|nav:home|清除對話|重新開始|reset|聯繫本人|留下邀約)$/.test(text) ||
     /^(?:invite:|nav:contact|contact:|topic:|work:)/.test(text) || contactIntent_(text);
@@ -68,17 +95,40 @@ function handleJobMatch_(event, text, cfg) {
     if (expired) data.receipts = {};
     Object.keys(data.receipts).forEach(function (id) { if (data.receipts[id].expiresAt <= now) delete data.receipts[id]; });
     var active = Object.keys(data.records).map(function (id) { return data.records[id]; }).find(function (r) {
-      return user === owner && (r.status === 'answering' || r.status === 'review');
+      return asApplicant && (!!r.testOwner === !!role.testing) &&
+        (!r.testOwner || r.testOwner === invitationVisitor_(user)) && (r.status === 'answering' || r.status === 'review');
     }), draft = data.drafts[actor];
-    var receiptKey = actor + ':' + eventKey_(event), old = data.receipts[receiptKey];
+    var receiptKey = actor + ':' + role.role + ':' + !!role.testing + ':' + eventKey_(event), old = data.receipts[receiptKey];
     if (old) return old.messages;
-    if (!explicit && !active && !draft && !expired) return null;
+    if (!explicit && !active && !draft && !expired && !role.expired) return null;
     function done(messages) {
       data.receipts[receiptKey] = { messages: messages, expiresAt: now + 86400000 };
       var keys = Object.keys(data.receipts);
       while (keys.length > 150) delete data.receipts[keys.shift()];
       savePortfolioStore_(store, cfg);
       return messages;
+    }
+    if (roleCommand) {
+      if (user !== owner) return done(jobMessage_('角色切換僅限已設定 LINE 通知的履歷本人使用。'));
+      var invitation = invitationDraft_(invitationKey_(user, cfg));
+      if (invitation && invitation.step < 5) return done(jobMessage_('請先完成或取消目前的邀約表單，再切換測試角色。職缺與邀約不會混用。'));
+      // 保留未分享回答與人資草稿；切換不會自動分享或送出。
+      Object.keys(data.records).forEach(function (id) {
+        if (['answering', 'review'].indexOf(data.records[id].status) >= 0) data.records[id].status = 'paused';
+      });
+      data.receipts = {};
+      savePortfolioStore_(store, cfg);
+      var props = PropertiesService.getScriptProperties();
+      if (roleCommand === 'exit') props.deleteProperty(jobRoleKey_(cfg));
+      else props.setProperty(jobRoleKey_(cfg), JSON.stringify({ owner: invitationVisitor_(user), role: roleCommand, expiresAt: now + 7200000 }));
+      return jobMessage_(roleCommand === 'exit' ? '已結束測試，回到應徵者本人。測試需求保留，可重新進入測試查看或刪除。' :
+        '本人測試｜目前角色：' + (roleCommand === 'recruiter' ? '人資' : '應徵者') +
+        '\n兩小時有效。測試需求與正式需求分開顯示；切換時保存草稿及回答，不自動分享。請點下方入口繼續。',
+        jobHomeActions_(user, cfg).map(function (button) { return [button.action.label, button.action.data]; }));
+    }
+    if (role.expired) {
+      PropertiesService.getScriptProperties().deleteProperty(jobRoleKey_(cfg));
+      return done(jobMessage_('本人測試已過期或設定已變更，已回到應徵者身分。剛才的輸入未當成回答，也未交給 AI。請重新輸入「模擬人資」開始測試，或輸入「首頁」。'));
     }
     if (navigation) {
       if (active) active.status = 'paused';
@@ -89,14 +139,17 @@ function handleJobMatch_(event, text, cfg) {
       delete data.drafts[actor]; return done(jobMessage_('已取消目前填寫。未分享的回答不會提供給人資。'));
     }
     if (text === '職缺對照' || text === 'jm:start') {
-      if (user === owner) return done(jobMessage_('請由人資帳號輸入「職缺對照」。你可輸入「待回答職缺」查看需求。'));
+      if (asApplicant) return done(jobMessage_('目前是應徵者角色。請切換「模擬人資」後貼職缺，或查看待回答需求。',
+        [['模擬人資', 'jm:role:recruiter'], ['待回答職缺', 'jm:list']]));
       if (!owner) return done(jobMessage_('本人尚未設定 LINE 通知，暫時無法受理。可使用「聯繫本人」。'));
       if (Object.keys(data.drafts).length >= 30 && !draft) return done(jobMessage_('目前填寫人數較多，請稍後再試。'));
       data.drafts[actor] = { id: sha256_(Utilities.getUuid()).slice(0, 16), step: 'job', expiresAt: now + 1800000 };
       return done(jobMessage_('請貼上職缺文字（最多 4000 字，不接受只有網址）。\n\n確認送出後，職缺將保存於本人的私人 Drive，供本人回答三題。未送出草稿保留 30 分鐘；送出需求保留七天，到期後不可查閱，並於下次使用本流程時清除。不寫入履歷或交給 AI。請勿貼私人或機密資料。輸入「取消」離開。'));
     }
     if (text === '我的職缺' || text === '待回答職缺' || text === 'jm:list') {
-      var rows = Object.keys(data.records).map(function (id) { return data.records[id]; }).filter(function (r) { return user === owner || r.visitor === actor; });
+      var rows = Object.keys(data.records).map(function (id) { return data.records[id]; }).filter(function (r) {
+        return asApplicant ? (!!r.testOwner === !!role.testing && (!r.testOwner || r.testOwner === invitationVisitor_(user))) : r.visitor === actor;
+      });
       rows = rows.reverse().slice(0, 10);
       return done(jobMessage_(rows.length ? '最近十筆職缺（七天有效；更多需求可由原通知編號開啟）\n' + rows.map(function (r) { return r.id + '｜' + r.focus + '｜' + r.status; }).join('\n') : '目前沒有職缺需求。',
         rows.slice(0, 10).map(function (r) { return [r.id.slice(0, 8), 'jm:view:' + r.id]; })));
@@ -109,15 +162,17 @@ function handleJobMatch_(event, text, cfg) {
       var record = { id: draft.id, visitor: actor, job: draft.job, focus: draft.focus,
         questions: jobQuestions_(draft.focus), answers: [], status: 'waiting', expiresAt: now + 7 * 86400000,
         notification: { status: 'attempting', retryKey: Utilities.getUuid() } };
+      if (user === owner && role.testing) record.testOwner = invitationVisitor_(user);
       data.records[record.id] = record; delete data.drafts[actor];
       // 先持久化送出結果；通知結果不明時不自動重寄。人資可以主動查詢，無須保存原始 LINE ID。
       var response = done(jobMessage_('需求已保存，編號 ' + record.id + '。通知結果請查看狀態；不代表本人已讀。\n請稍後輸入「我的職缺」查看回答，系統不會主動推送回答給你。', [['查看狀態', 'jm:view:' + record.id]]));
       record.notification = Object.assign(record.notification, sendOwnerLineText_(owner,
-        '收到職缺補充需求｜' + record.id + '\n重點條件：' + record.focus + '\n\n請輸入「待回答職缺」，選擇此編號並查看職缺，再開始依序回答三題。回答需經你確認才分享。七天有效。', cfg, record.notification.retryKey));
+        (record.testOwner ? '【本人測試】請先輸入「切回應徵者」。\n' : '') + '收到職缺補充需求｜' + record.id + '\n重點條件：' + record.focus + '\n\n請輸入「待回答職缺」，選擇此編號並查看職缺，再開始依序回答三題。回答需經你確認才分享。七天有效。', cfg, record.notification.retryKey));
       savePortfolioStore_(store, cfg); return response;
     }
     if (command) {
-      var action = command[1], r = data.records[command[2]], isOwner = user === owner;
+      var action = command[1], r = data.records[command[2]], isOwner = asApplicant && r &&
+        (!!r.testOwner === !!role.testing) && (!r.testOwner || r.testOwner === invitationVisitor_(user));
       if (!r || !isOwner && r.visitor !== actor) return done(jobMessage_('找不到可存取的需求，可能已刪除或過期。'));
       if (action === 'cancel') { delete data.records[r.id]; data.receipts = {}; return done(jobMessage_('已刪除這份職缺與回答。對方先前已看過或保存的內容無法收回。')); }
       if (action === 'job') return done(jobMessage_('原職缺｜' + r.id + '\n' + r.job, [['返回', 'jm:view:' + r.id]]));

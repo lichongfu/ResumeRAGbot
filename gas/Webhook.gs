@@ -129,8 +129,9 @@ function handleEvent_(event, cfg) {
           prepared = { index: currentIndex, source: currentSource }; }
       } catch (_) { MESSAGE_TOPICS_ = []; }
     }
+    var invitation = invitationDraft_(invitationKey_(event.source.userId, cfg));
     if (!cfg.enabled) messages = [textMessage_('履歷助理目前暫停服務，請稍後再試。')];
-    else if (!invitationDraft_(invitationKey_(event.source.userId, cfg)) &&
+    else if ((!invitation || invitation.step >= 5 || /^jm:role:|^(模擬人資|切回應徵者|結束測試)$/.test(text)) &&
       (messages = handleJobMatch_(event, text, cfg))) { /* 職缺與私人回答不進一般問答。 */ }
     else if ((messages = handleContact_(event, text, cfg, prepared))) { /* 聯繫與邀約不經 RAG。 */ }
     else if (/^(清除對話|重新開始|reset)$/i.test(text)) {
@@ -139,7 +140,7 @@ function handleEvent_(event, cfg) {
       messages = [textMessage_('短期對話記憶已清除，現在可以開始新的問題。')];
     }
     else if (event.type === 'follow' || /^(選單|首頁|回首頁|履歷首頁|menu|home|開始|nav:home)$/i.test(text)) {
-      messages = [welcomeMessage_(cfg, prepared)];
+      messages = [welcomeMessage_(cfg, prepared, event.source.userId)];
     }
     else if (/^(使用說明|說明|help)$/i.test(text)) messages = [textMessage_(helpText_())];
     else if (/^(隱私|privacy)$/i.test(text)) messages = [textMessage_(privacyText_())];

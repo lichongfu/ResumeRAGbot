@@ -116,7 +116,7 @@ function friendlyAvatar_() {
 /**
  * 首頁與 Quick Reply 沿用相同順序：我是誰、快速一覽、同步產生的適性主題。
  */
-function welcomeMessage_(cfg, prepared) {
+function welcomeMessage_(cfg, prepared, userId) {
   var buttons = visibleMenuTopics_(), profile = {}, portrait = null;
   // 新舊索引不符時，不能把已從文件刪掉的個資繼續顯示在首頁。
   if (prepared && prepared.index && prepared.source && prepared.index.fingerprint === prepared.source.fingerprint) {
@@ -161,7 +161,7 @@ function welcomeMessage_(cfg, prepared) {
   return { type: 'flex', altText: Array.from(name).slice(0,50).join('') + '｜認識我・個人特質・履歷導覽', quickReply: quickReply_(), contents: { type: 'carousel', contents: [
     card('01', 'HELLO / 認識我', identity, [contactButton_('聯繫本人', 'nav:contact')]),
     card('02', 'ABOUT / 個人特質', traits, [compactButton(buttons[1])]),
-    card('03', 'EXPLORE / 履歷導覽', navigation, [{ type: 'button', height: 'sm', style: 'link', color: '#23735B', action: { type: 'postback', label: '回首頁', data: 'nav:home', displayText: '首頁' } }, contactButton_('貼職缺，詢問三題', 'jm:start'), contactButton_('查看職缺進度', 'jm:list')])
+    card('03', 'EXPLORE / 履歷導覽', navigation, [{ type: 'button', height: 'sm', style: 'link', color: '#23735B', action: { type: 'postback', label: '回首頁', data: 'nav:home', displayText: '首頁' } }].concat(jobHomeActions_(userId, cfg)))
   ] } };
 }
 
@@ -169,7 +169,7 @@ function welcomeMessage_(cfg, prepared) {
  * 訪客輸入「使用說明」時顯示的操作方法。
  */
 function helpText_() {
-  return '輸入「職缺對照」可送出職缺，請本人補充三題；「我的職缺」查詢結果。本人輸入「待回答職缺」處理需求。\n\n輸入「聯繫本人」「想約面試」或「想合作」，可查看 Email 或留下邀約。\n\n你可以直接提問，例如：\n• 請用 30 秒介紹這位求職者。\n• 有哪些工作經歷與具體成果？\n• 做過哪些與資料分析相關的專案？\n• 這份履歷有哪些符合產品經理職缺的條件？\n• 如何聯絡本人？\n\n約 10 分鐘內可接續追問同一件作品，例如「這張用了什麼配色？」；輸入「清除對話」可重新開始。短期記憶可能提早失效，屆時請補上作品名稱。回答依據公開履歷；找不到足夠資料的問題會記錄給履歷主人確認與補充。\n\n隨時輸入「首頁」「選單」或「回首頁」，就能重新開啟三張履歷卡；輸入「隱私」查看資料使用方式。';
+  return '本人可輸入「模擬人資」用同一帳號貼職缺，再輸入「切回應徵者」回答；切回「模擬人資」查看結果。「結束測試」返回正式身分，測試模式兩小時有效。\n\n輸入「職缺對照」可送出職缺，請本人補充三題；「我的職缺」查詢結果。本人輸入「待回答職缺」處理需求。\n\n輸入「聯繫本人」「想約面試」或「想合作」，可查看 Email 或留下邀約。\n\n你可以直接提問，例如：\n• 請用 30 秒介紹這位求職者。\n• 有哪些工作經歷與具體成果？\n• 做過哪些與資料分析相關的專案？\n• 這份履歷有哪些符合產品經理職缺的條件？\n• 如何聯絡本人？\n\n約 10 分鐘內可接續追問同一件作品，例如「這張用了什麼配色？」；輸入「清除對話」可重新開始。短期記憶可能提早失效，屆時請補上作品名稱。回答依據公開履歷；找不到足夠資料的問題會記錄給履歷主人確認與補充。\n\n隨時輸入「首頁」「選單」或「回首頁」，就能重新開啟三張履歷卡；輸入「隱私」查看資料使用方式。';
 }
 
 /**

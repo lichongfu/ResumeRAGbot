@@ -22,6 +22,81 @@ function fixture(mode) {
 }
 const output = messages => messages.map(m => m.text).join('\n');
 
+for (const mode of [undefined, 'bundle']) test('owner can test both roles with isolated data and explicit sharing: ' + (mode || 'sources'), () => {
+  const f = fixture(mode), cfg = f.gas.config_();
+  const labels = user => f.gas.jobHomeActions_(user, cfg).map(b => b.action.data);
+  assert(labels(owner).includes('jm:role:recruiter'));
+  assert(!labels(owner).includes('jm:start'));
+  assert(!labels('hr').some(x => x.startsWith('jm:role:')));
+  assert.match(output(f.step('hr', 'jm:role:recruiter')), /僅限/);
+  assert.match(output(f.step(owner, '模擬人資')), /目前角色：人資/);
+  assert(labels(owner).includes('jm:start'));
+  assert(!labels(owner).includes('jm:role:recruiter'));
+  f.step(owner, '職缺對照'); f.step(owner, 'Python 開發'); f.step(owner, 'Python');
+  const virtual = f.gas.invitationVisitor_(owner + ':job-test:' + cfg.docId);
+  const draft = f.gas.loadPortfolioStore_(cfg).jobMatch.drafts[virtual], id = draft.id;
+  f.step(owner, 'jm:submit:' + id);
+  assert(f.records()[id].testOwner);
+  assert.match(output(f.step(owner, 'jm:answer:' + id)), /僅限/);
+  f.step(owner, '切回應徵者');
+  assert(!labels(owner).includes('jm:start'));
+  f.step(owner, 'jm:answer:' + id); f.step(owner, '我的 Python 作品');
+  f.step(owner, '模擬人資');
+  assert.equal(f.records()[id].status, 'paused');
+  assert(!output(f.step(owner, 'jm:view:' + id)).includes('我的 Python 作品'));
+  f.step(owner, '切回應徵者'); f.step(owner, 'jm:answer:' + id);
+  assert.equal(f.records()[id].answers.length, 1);
+  f.step(owner, '處理方式'); f.step(owner, '工作期待'); f.step(owner, 'jm:share:' + id);
+  f.step(owner, '模擬人資');
+  assert.match(output(f.step(owner, 'jm:view:' + id)), /我的 Python 作品/);
+  assert.match(output(f.step('other', 'jm:view:' + id)), /找不到/);
+  f.step(owner, '結束測試');
+  assert(!output(f.step(owner, '待回答職缺')).includes(id));
+  assert.equal(f.gas.jobRoleState_(owner, cfg).testing, undefined);
+});
+
+test('test recruiter cannot see real requests and expired roles do not send input into RAG', () => {
+  const f = fixture(), real = f.submit('real-hr'), cfg = f.gas.config_();
+  f.step(owner, '模擬人資');
+  assert.match(output(f.step(owner, 'jm:view:' + real)), /找不到/);
+  const key = f.gas.jobRoleKey_(cfg), state = JSON.parse(f.state.properties.get(key));
+  state.expiresAt = 1; f.state.properties.set(key, JSON.stringify(state));
+  assert.match(output(f.step(owner, '私人的未完成回答')), /測試已過期/);
+  assert.equal(f.state.properties.has(key), false);
+  assert(!f.state.calls.some(c => c.url.includes('generativelanguage')));
+  const view = f.step(owner, 'jm:view:' + real);
+  assert(view[0].quickReply.items.some(item => item.action.data === 'jm:answer:' + real));
+});
+
+test('role switches preserve the test recruiter draft and cannot be triggered by unrelated text', () => {
+  const f = fixture(), cfg = f.gas.config_();
+  assert.equal(f.step('hr', 'toString'), null);
+  f.step(owner, '模擬人資'); f.step(owner, '職缺對照'); f.step(owner, 'Python 開發');
+  const virtual = f.gas.invitationVisitor_(owner + ':job-test:' + cfg.docId);
+  const id = f.gas.loadPortfolioStore_(cfg).jobMatch.drafts[virtual].id;
+  f.step(owner, '切回應徵者'); f.step(owner, '模擬人資'); f.step(owner, 'Python');
+  f.step(owner, 'jm:submit:' + id);
+  assert.equal(f.records()[id].focus, 'Python');
+  assert(f.records()[id].testOwner);
+});
+
+test('home uses sender role and active invitation prevents switching roles', () => {
+  const f = fixture(), cfg = f.gas.config_(); let n = 0;
+  function send(text) { const e = event(text, 'role-web-' + ++n); e.source.userId = owner; f.gas.handleEvent_(e, cfg); }
+  send('首頁');
+  let home = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
+  let buttons = home.contents.contents[2].footer.contents.map(b => b.action.data);
+  assert(!buttons.includes('jm:start')); assert(buttons.includes('jm:role:recruiter'));
+  send('模擬人資'); send('首頁');
+  home = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
+  buttons = home.contents.contents[2].footer.contents.map(b => b.action.data);
+  assert(buttons.includes('jm:start')); assert(buttons.includes('jm:role:applicant'));
+  send('留下邀約'); send('結束測試');
+  const reply = f.state.calls.filter(c => c.url.endsWith('/message/reply')).at(-1).body.messages[0];
+  assert.match(reply.text, /先完成或取消/);
+  assert.equal(f.gas.jobRoleState_(owner, cfg).role, 'recruiter');
+});
+
 test('postback entry sends a valid LINE reply without an empty quickReply array', () => {
   for (const mode of [undefined, 'bundle']) {
     const f = fixture(mode), e = event('', 'postback-entry');
