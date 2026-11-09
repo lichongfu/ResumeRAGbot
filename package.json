@@ -1,6 +1,6 @@
 {
   "name": "resume-rag-bot",
-  "version": "3.0.0-candidate.1",
+  "version": "3.0.0-candidate.2",
   "private": true,
   "type": "module",
   "engines": {

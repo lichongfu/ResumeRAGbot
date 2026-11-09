@@ -1,6 +1,6 @@
 # ResumeRAGbot
 
-> 此 Fork 的開發分支為 lichongfu 的 **v3 候選版 `3.0.0-candidate.1`**，不是老師的正式 v3。
+> 此 Fork 的開發分支為 lichongfu 的 **v3 候選版 `3.0.0-candidate.2`**，不是老師的正式 v3。
 > 新增「人資貼職缺 → 本人回答三題 → 確認分享 → 面試追問」流程，詳見 [職缺補充訪談](docs/職缺補充訪談.md)。
 > 下方 v2 說明保留作為正式版基礎；本候選版尚待自己的 GAS 部署與 LINE 實測。
 

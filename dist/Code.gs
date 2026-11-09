@@ -42,7 +42,7 @@ function config_() {
 /**
  * 目前程式版本；發布時須與 package.json、學生安裝包及正式部署一致。
  */
-function appVersion_() { return '3.0.0-candidate.1'; }
+function appVersion_() { return '3.0.0-candidate.2'; }
 
 /**
  * 接受原始文件 ID 或一般 Google Docs 網址，統一取得文件 ID。
@@ -2418,7 +2418,8 @@ function testContactFlow(token) {
  */
 function jobMessage_(text, actions) {
   var message = textMessage_(text);
-  message.quickReply = { items: (actions || []).map(function (a) {
+  delete message.quickReply;
+  if (actions && actions.length) message.quickReply = { items: actions.map(function (a) {
     return { type: 'action', action: { type: 'postback', label: a[0], data: a[1], displayText: a[0] } };
   }) };
   return [message];

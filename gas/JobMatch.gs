@@ -4,7 +4,8 @@
  */
 function jobMessage_(text, actions) {
   var message = textMessage_(text);
-  message.quickReply = { items: (actions || []).map(function (a) {
+  delete message.quickReply;
+  if (actions && actions.length) message.quickReply = { items: actions.map(function (a) {
     return { type: 'action', action: { type: 'postback', label: a[0], data: a[1], displayText: a[0] } };
   }) };
   return [message];

@@ -22,6 +22,28 @@ function fixture(mode) {
 }
 const output = messages => messages.map(m => m.text).join('\n');
 
+test('postback entry sends a valid LINE reply without an empty quickReply array', () => {
+  for (const mode of [undefined, 'bundle']) {
+    const f = fixture(mode), e = event('', 'postback-entry');
+    e.source.userId = 'hr'; e.type = 'postback'; e.postback = { data: 'jm:start' };
+    f.state.response = call => {
+      if (call.url.endsWith('/message/reply')) {
+        for (const message of call.body.messages) {
+          assert(!message.quickReply || message.quickReply.items.length > 0,
+            'LINE rejects a present quickReply with zero items');
+        }
+      }
+      return { body: {} };
+    };
+    assert.equal(f.gas.handleEvent_(e, f.gas.config_()), 'replied');
+    const reply = f.state.calls.find(c => c.url.endsWith('/message/reply'));
+    assert.match(reply.body.messages[0].text, /請貼上職缺文字/);
+    assert(!('quickReply' in reply.body.messages[0]));
+    const withActions = f.gas.jobMessage_('test', [['取消', 'jm:cancel-draft']]);
+    assert.equal(withActions[0].quickReply.items.length, 1);
+  }
+});
+
 for (const mode of [undefined, 'bundle']) test('private three-question workflow with explicit sharing: ' + (mode || 'sources'), () => {
   const f = fixture(mode), id = f.submit();
   assert.equal(f.records()[id].status, 'waiting');
