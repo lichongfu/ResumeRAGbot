@@ -42,7 +42,7 @@ function config_() {
 /**
  * 目前程式版本；發布時須與 package.json、學生安裝包及正式部署一致。
  */
-function appVersion_() { return '3.0.0-candidate.6'; }
+function appVersion_() { return '3.0.0-candidate.7'; }
 
 /**
  * 接受原始文件 ID 或一般 Google Docs 網址，統一取得文件 ID。
@@ -1932,10 +1932,13 @@ function welcomeMessage_(cfg, prepared, userId) {
   }
   function action(topic) { return { type: 'postback', label: topic.label, data: 'topic:' + topic.id, displayText: topic.label }; }
   function card(number, title, contents, footer) {
+    footer.forEach(function (button) {
+      if (button.type === 'button') { button.style = button.action.data === 'jg:start' ? 'primary' : 'link'; button.color = '#23735B'; }
+    });
     return { type: 'bubble', size: 'kilo', header: { type: 'box', layout: 'horizontal', paddingAll: '16px', backgroundColor: '#143D35', contents: [
       text(title, 'xs', '#FFFFFF', true), { type: 'text', text: number + ' / 03', align: 'end', size: 'xxs', color: '#B7D8C9', flex: 0 }
     ] }, body: { type: 'box', layout: 'vertical', paddingAll: '18px', spacing: 'md', height: '300px', backgroundColor: '#FAFBF8', contents: contents },
-      footer: { type: 'box', layout: 'vertical', paddingAll: '12px', backgroundColor: '#FAFBF8', contents: footer } };
+      footer: { type: 'box', layout: 'vertical', height: '184px', justifyContent: 'flex-end', spacing: 'xs', paddingAll: '12px', backgroundColor: '#FAFBF8', contents: footer } };
   }
   var identity = [portrait ? { type: 'box', layout: 'vertical', width: '80px', height: '80px', cornerRadius: '40px', alignItems: 'center', contents: [
     { type: 'image', url: portrait.imageUrl, size: 'full', aspectRatio: '1:1', aspectMode: 'cover' }
@@ -1965,7 +1968,7 @@ function welcomeMessage_(cfg, prepared, userId) {
     card('01', 'HELLO / 認識我', identity, [contactButton_('看履歷', 'topic:' + buttons[1].id),
       contactButton_('貼職缺', 'jg:start'), contactButton_('聯繫邀約', 'nav:contact')]),
     card('02', 'ABOUT / 個人特質', traits, [compactButton(buttons[1])]),
-    card('03', 'EXPLORE / 履歷導覽', navigation, [{ type: 'button', height: 'sm', style: 'link', color: '#23735B', action: { type: 'postback', label: '回首頁', data: 'nav:home', displayText: '首頁' } }].concat(jobHomeActions_(userId, cfg)))
+    card('03', 'EXPLORE / 履歷導覽', navigation, jobHomeActions_(userId, cfg))
   ] } };
 }
 
@@ -1973,14 +1976,14 @@ function welcomeMessage_(cfg, prepared, userId) {
  * 訪客輸入「使用說明」時顯示的操作方法。
  */
 function helpText_() {
-  return "從「首頁」開始：\n• 看履歷：概覽經歷、技能與作品，也能自由提問。\n• 貼職缺：貼完整職缺 → 確認條件 → AI 比對並問三題 → 確認回答 → 查看整合結果。\n• 聯繫邀約：查看聯絡方式或留下邀約，確認後才送出。\n\n「我的職缺與訪談」會回到同一份職缺的原步驟，不需要切換角色，也不需重貼。三題由 AI 依職缺與履歷缺口生成，一次問一題；可略過、暫停或修改。確認後再產生正式面試的深入追問。\n\n輸入「取消」會暫停並保留職缺；刪除請到「職缺設定」。更換職缺前會再次確認。舊版的「待回答職缺」及角色按鈕會帶回目前職缺。\n\n作品可接續追問，短期記憶約 10 分鐘；輸入「清除對話」可重設。輸入「隱私」查看資料用途。";
+  return "從「首頁」開始：\n• 看履歷：概覽經歷、技能與作品，也能自由提問。\n• 貼職缺：貼完整職缺 → 確認條件 → AI 比對並問三題 → 確認回答 → 查看整合結果。\n• 聯繫邀約：查看聯絡方式或留下邀約，確認後才送出。\n\n人資也可進入「招募工作台」貼多份已獲授權的履歷，查看熱圖、原文與資料覆蓋排序；數字不是能力分數。\n輸入「預約面談」選時段，本人可輸入「管理面談時段」設定。邀約會預填職缺摘要，確認後才送出。\n\n「我的職缺與訪談」會回到同一份職缺的原步驟，不需要切換角色，也不需重貼。三題由 AI 依職缺與履歷缺口生成，一次問一題；可略過、暫停或修改。確認後再產生正式面試的深入追問。\n\n輸入「取消」會暫停並保留職缺；刪除請到「職缺設定」。更換職缺前會再次確認。舊版的「待回答職缺」及角色按鈕會帶回目前職缺。\n\n作品可接續追問，短期記憶約 10 分鐘；輸入「清除對話」可重設。輸入「隱私」查看資料用途。";
 }
 
 /**
  * 向訪客說明提問、短期記憶與待補充問題的資料使用方式。
  */
 function privacyText_() {
-  return "我是 AI 履歷助理，重要資訊請向本人查證。\n\n資料使用方式：\n• 職缺流程：職缺及少量公開履歷片段交由 Gemini 比對與出題。每題回答先存於私人準備單；三題完成、確認送出後，才交給 Gemini 產生正式面試追問。回答標示為填寫者補充，不自動變成履歷事實，不寫回 Doc 或索引，不自動分享、寄信或推播。\n• 各訪客以專案及 Doc 綁定的雜湊隔離，私人 Drive 保存 24 小時；到期後不可查閱，後續使用時清理，沒有背景清理排程。回首頁或取消是暫停；職缺設定中可確認刪除。已傳出的 LINE 訊息或自行複製的內容無法收回。\n• 舊版訪談資料保留於原私人資料檔，不自動轉成新證據；只有有權限的帳號可沿用尚未過期的職缺。\n• 邀約表單不交給 AI，確認後才保存至私人收件匣，並依設定以 Email、LINE 通知本人。\n• 一般問答只用公開區內容，提問與檢索片段會送至 Gemini；找不到答案時可能將問題寫入 Doc 的待補充區，不附訪客 LINE ID。\n• 作品預覽只用本人已開放的獨立圖片副本。短期對話記憶約 10 分鐘，事件以雜湊去重；不保存訪客原始 LINE ID，主人通知則使用已設定的 OWNER_LINE_USER_ID。\n\n請勿傳送密碼、證件或機密資料。LINE 與 Google 仍適用各自資料政策。";
+  return "我是 AI 履歷助理，重要資訊請向本人查證。\n\n資料使用方式：\n• 招募工作台的候選文字會交給 Gemini 找引文，與職缺一起到期（最長 24 小時）。一般 LINE 訪客彼此隔離；檔案實際在 bot 主人的 Drive，持有人仍可讀取。人工決定與理由不送 AI。\n• 面談時段選擇先暫留五分鐘，確認邀約後才登記預約。僅管理本 bot，不同步外部行事曆；預約在結束三十天後於後續操作時清理。取消預約不自動寄取消通知。\n• 職缺流程：職缺及少量公開履歷片段交由 Gemini 比對與出題。每題回答先存於私人準備單；三題完成、確認送出後，才交給 Gemini 產生正式面試追問。回答標示為填寫者補充，不自動變成履歷事實，不寫回 Doc 或索引，不自動分享、寄信或推播。\n• 各訪客以專案及 Doc 綁定的雜湊隔離，私人 Drive 保存 24 小時；到期後不可查閱，後續使用時清理，沒有背景清理排程。回首頁或取消是暫停；職缺設定中可確認刪除。已傳出的 LINE 訊息或自行複製的內容無法收回。\n• 舊版訪談資料保留於原私人資料檔，不自動轉成新證據；只有有權限的帳號可沿用尚未過期的職缺。\n• 邀約表單不交給 AI，確認後才保存至私人收件匣，並依設定以 Email、LINE 通知本人。\n• 一般問答只用公開區內容，提問與檢索片段會送至 Gemini；找不到答案時可能將問題寫入 Doc 的待補充區，不附訪客 LINE ID。\n• 作品預覽只用本人已開放的獨立圖片副本。短期對話記憶約 10 分鐘，事件以雜湊去重；不保存訪客原始 LINE ID，主人通知則使用已設定的 OWNER_LINE_USER_ID。\n\n請勿傳送密碼、證件或機密資料。LINE 與 Google 仍適用各自資料政策。";
 }
 
 /**
@@ -2186,17 +2189,21 @@ function invitationPrompt_(draft) {
     (draft.step === 0 ? '\n\n確認後才會存入履歷主人的私有邀約收件匣，並以 Email 與已設定的 LINE 通知本人；填寫內容不交給 AI。30 分鐘內可繼續，輸入「取消」可離開。' : ''));
   message.quickReply = { items: [{ type: 'action', action: { type: 'postback', label: '取消邀約', data: 'invite:cancel', displayText: '取消邀約' } }] };
   if (draft.step === 3) message.quickReply.items.unshift({ type: 'action', action: { type: 'postback', label: '略過時段', data: 'invite:skip:' + draft.id, displayText: '略過時段' } });
+  if (draft.step === 3) message.quickReply.items.unshift({ type: 'action', action: { type: 'postback', label: '選擇面談時段', data: 'slot:list', displayText: '選擇面談時段' } });
   return [message];
 }
 
 function invitationConfirmation_(draft) {
   var lines = INVITATION_FIELDS_.map(function (field) { return field.label + '：' + (draft.fields[field.key] || '不限定'); });
-  var summary = textMessage_('請確認邀約內容\n\n' + lines.join('\n\n') + '\n\n按「確認送出」後，以上資料會存入履歷主人的私有收件匣，並以 Email 與已設定的 LINE 通知本人。這不代表面試或合作已排定。');
+  var summary = textMessage_('請確認邀約內容\n\n' + lines.join('\n\n') +
+    (draft.context ? '\n\n職缺原文與對照摘要會隨邀約保存，Email 通知會附職缺原文。' : '') +
+    (draft.slotId ? '\n\n已暫留時段，確認時會再次檢查是否仍可預訂。' : '') + '\n\n按「確認送出」後，以上資料會存入履歷主人的私有收件匣，並以 Email 與已設定的 LINE 通知本人。這不代表面試或合作已排定。');
   delete summary.quickReply;
   return [summary, { type: 'flex', altText: '確認送出邀約，或重新填寫', contents: { type: 'bubble', size: 'kilo',
     body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '要送出這份邀約嗎？', weight: 'bold', wrap: true }] },
     footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [contactButton_('確認送出', 'invite:submit:' + draft.id),
-      contactButton_('重新填寫', 'invite:restart:' + draft.id), contactButton_('取消邀約', 'invite:cancel')] } } }];
+      contactButton_(draft.slotId ? '更換面談時段' : '選擇面談時段', 'slot:list'),
+      contactButton_('修改職缺與問題', 'invite:editmessage:' + draft.id), contactButton_('重新填寫', 'invite:restart:' + draft.id), contactButton_('取消邀約', 'invite:cancel')] } } }];
 }
 
 function invitationReceipt_(record) {
@@ -2205,7 +2212,8 @@ function invitationReceipt_(record) {
   var detail = status === 'sent' ? 'Email 通知已送交 Google 寄送，請等候本人透過您留下的方式回覆。' :
     lineSent ? 'LINE 通知已送交平台推播，請等候本人透過您留下的方式回覆。' :
     status && status !== 'test_skipped' ? 'Email 通知尚未確認寄出，您也可以使用「聯繫本人」中的 Email 直接聯絡。' : '供本人確認並透過您留下的方式回覆。';
-  return [textMessage_('邀約已存入履歷主人的私有收件匣。' + detail + '這不代表面試或合作已排定。')];
+  return [textMessage_('邀約已存入履歷主人的私有收件匣。' + detail +
+    (record.booking && record.booking.status === 'reserved' ? '所選時段已登記保留，請與本人確認面談細節；輸入「我的預約」可查詢或取消。' : record.booking ? '此邀約的時段預約已取消。' : '這不代表面試或合作已排定。'))];
 }
 
 /** 通知信附完整邀約，主人可直接閱讀；只使用純文字，不執行訪客提供的 HTML。 */
@@ -2215,7 +2223,7 @@ function invitationEmail_(record, recipient) {
     body: '有人透過您的履歷機器人留下邀約。\n\n' +
       INVITATION_FIELDS_.map(function (field) { return field.label + '：\n' + (fields[field.key] || '不限定'); }).join('\n\n') +
       '\n\n收到時間：' + Utilities.formatDate(new Date(record.createdAt), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss') + '（台北時間）' +
-      '\n邀約編號：' + record.id + '\n\n邀約已保存在您的私人收件匣。請依對方留下的回覆方式聯繫；系統沒有自動安排面試。' };
+      '\n邀約編號：' + record.id + (record.context ? '\n\n本次職缺原文：\n' + record.context.job : '') + '\n\n邀約已保存在您的私人收件匣。請依對方留下的回覆方式聯繫；預留時段仍需雙方確認面談細節。' };
   // Reply-To 只接受完整、單一的信箱；電話、LINE ID 或混合文字不當作郵件標頭。
   var replyTo = String(fields.replyTo || '').trim();
   if (usableEmail_(replyTo)) message.replyTo = replyTo;
@@ -2273,9 +2281,10 @@ function handleContact_(event, text, cfg, prepared, options) {
   var pendingKey = 'pending_' + key;
   if (/^(?:使用說明|說明|help|隱私|privacy)$/i.test(text)) return null;
   if (event.type === 'follow' || /^(?:首頁|選單|回首頁|履歷首頁|home|menu|開始|nav:home|清除對話|重新開始|reset)$/i.test(text) || /^(?:topic|work):/.test(text)) {
+    releaseInterviewHold_(event.source.userId, invitationDraft_(key), cfg, false);
     cache.remove(key); props.deleteProperty(pendingKey); return null;
   }
-  if (text === 'nav:contact') { cache.remove(key); props.deleteProperty(pendingKey); return [contactMessage_(cfg, prepared)]; }
+  if (text === 'nav:contact') { releaseInterviewHold_(event.source.userId, invitationDraft_(key), cfg, false); cache.remove(key); props.deleteProperty(pendingKey); return [contactMessage_(cfg, prepared)]; }
   // 回傳獨立純文字信箱，手機可長按、電腦可右鍵複製；不依賴 mailto 或剪貼簿動作的支援。
   if (text === 'contact:email' || /^(?:取得\s*Email|寄信地址)$/i.test(text)) {
     var contact;
@@ -2295,13 +2304,18 @@ function handleContact_(event, text, cfg, prepared, options) {
       return messages;
     }
     if (text === 'invite:cancel' || /^(?:取消|取消邀約)$/.test(text)) {
+      releaseInterviewHold_(event.source.userId, draft, cfg, true);
       cache.remove(key); props.deleteProperty(pendingKey); draft = null; return remember([textMessage_('已取消填寫，未送出新的邀約。')]);
     }
     if (text === 'invite:start' || text === '留下邀約' || draft && text === 'invite:restart:' + draft.id) {
+      var previous = draft && text === 'invite:restart:' + draft.id ? draft : null;
+      releaseInterviewHold_(event.source.userId, draft, cfg, true);
       draft = { id: sha256_(Utilities.getUuid()).slice(0, 32), step: 0, fields: {}, expiresAt: Date.now() + 1800000 };
+      if (previous && previous.context) { draft.context = previous.context; draft.fields.message = previous.fields.message; draft.prefilled = true; }
       props.setProperty(pendingKey, draft.id);
       return remember(invitationPrompt_(draft));
     }
+    if (draft && draft.step === 4 && text === 'invite:editmessage:' + draft.id) { draft.step = 1; draft.editReturn = 4; return remember(invitationPrompt_(draft)); }
     var submit = /^invite:submit:([a-f0-9]{32})$/.exec(text);
     if (submit) {
       var store = loadPortfolioStore_(cfg), records = store.invitations || {}, existing = records[submit[1]], visitor = invitationVisitor_(event.source.userId);
@@ -2309,6 +2323,11 @@ function handleContact_(event, text, cfg, prepared, options) {
       if (!draft || draft.id !== submit[1] || draft.step !== 4) return [textMessage_('這份確認已過期或已被新的草稿取代。請使用最新確認卡片，或重新選擇「留下邀約」。')];
       try {
         records[draft.id] = { id: draft.id, visitor: visitor, createdAt: new Date().toISOString(), status: 'new', fields: draft.fields };
+        if (!commitInterviewBooking_(store, draft, records[draft.id], event.source.userId)) {
+          delete draft.slotId; delete draft.fields.availability; draft.step = 3;
+          return remember([textMessage_('時段暫留已過期或不再可用，邀約尚未送出，請重新選擇時間。')].concat(invitationPrompt_(draft)));
+        }
+        if (draft.context) records[draft.id].context = draft.context;
         store.invitations = records;
         // 本函式已持鎖，不再次呼叫會取得同一把鎖的 updatePortfolioStore_。
         savePortfolioStore_(store, cfg);
@@ -2327,6 +2346,11 @@ function handleContact_(event, text, cfg, prepared, options) {
       else if (event.type !== 'message' || !text || /^invite:/.test(text)) return invitationPrompt_(draft);
       else if (text.length > field.limit) return [textMessage_('這一欄請控制在 ' + field.limit + ' 字內，再傳送一次。')];
       draft.fields[field.key] = value; draft.step++;
+      if (draft.editReturn === 4) { draft.step = 4; delete draft.editReturn; }
+      else {
+        if (draft.step === 1 && draft.prefilled && draft.fields.message) draft.step = 2;
+        if (draft.step === 3 && draft.slotId) draft.step = 4;
+      }
       return remember(draft.step === 4 ? invitationConfirmation_(draft) : invitationPrompt_(draft));
     }
     if (draft && draft.step === 4) return invitationConfirmation_(draft);
@@ -2356,7 +2380,10 @@ function updateInvitation(token, id, action) {
     if (!/^[a-f0-9]{32}$/.test(String(id)) || ['handled', 'new', 'delete'].indexOf(action) < 0) throw new Error('REVIEW_INVALID_INPUT');
     updatePortfolioStore_(cfg, function (store) {
       if (!store.invitations || !store.invitations[id]) return;
-      if (action === 'delete') delete store.invitations[id];
+      if (action === 'delete') {
+        if (store.invitations[id].booking && store.invitations[id].booking.status === 'reserved') throw new Error('此邀約仍有預約，請先取消預約再刪除。');
+        delete store.invitations[id];
+      }
       else store.invitations[id].status = action;
     });
     return { status: 'ok' };
@@ -2441,7 +2468,7 @@ function jobInterviewActions_(user, cfg) {
   return actions;
 }
 function jobHomeActions_(user, cfg) {
-  return [contactButton_('我的職缺與訪談', 'jg:resume')];
+  return [contactButton_('我的職缺與訪談', 'jg:resume'), contactButton_('招募工作台', 'rc:menu'), contactButton_('預約面談', 'slot:list')];
 }
 
 function jobMessage_(text, actions) {
@@ -2734,14 +2761,15 @@ function journeyReview_(s) {
 }
 function journeyActions_(s) {
   if (s.stage === 'complete') return [['證據與作品', 'jg:evidence:' + s.id], ['三題回答', 'jg:answers:' + s.id],
-    ['面試追問', 'jg:questions:' + s.id], ['完整準備單', 'jg:report:' + s.id], ['留下邀約', 'jg:invite:' + s.id], ['職缺設定', 'jg:options:' + s.id]];
+    ['面試追問', 'jg:questions:' + s.id], ['完整準備單', 'jg:report:' + s.id], ['留下邀約', 'jg:invite:' + s.id],
+    ['招募工作台／需求熱圖', 'rc:menu'], ['預約面談', 'slot:list'], ['職缺設定', 'jg:options:' + s.id]];
   return [['繼續這份職缺', 'jg:resume'], ['回首頁', 'nav:home']];
 }
 function journeyPrompt_(s) {
   var interview = s.interview, question = interview.questions[interview.cursor], token = journeyToken_(s);
   return jobMessage_('職缺面試流程｜3 / 5 AI 訪談 ' + (interview.cursor + 1) + ' / 3\n' + s.job.split('\n')[0].slice(0, 70) +
     '\n\n' + question.text + '\n\n請直接回答，最多 800 字。可略過或稍後繼續。補充內容會標示為「' + interview.origin + '」，不直接變成履歷事實；三題完成後仍可修改並確認。',
-    [['略過這題', 'jg:skip:' + s.id + ':' + token], ['稍後繼續', 'jg:leave:' + s.id], ['查看相關證據', 'jg:evidence:' + s.id], ['職缺設定', 'jg:options:' + s.id]]);
+    [['略過這題', 'jg:skip:' + s.id + ':' + token], ['稍後繼續', 'jg:leave:' + s.id], ['查看相關證據', 'jg:evidence:' + s.id], ['人資：候選比較', 'rc:menu'], ['職缺設定', 'jg:options:' + s.id]]);
 }
 function journeyAnswersText_(s) {
   var interview = s.interview;
@@ -2880,6 +2908,7 @@ function journeyRun_(event, cfg, id, task, token) {
     if (s.busyUntil > Date.now()) return { busy: true };
     if (task === 'extract' && s.stage !== 'extract' || task === 'compare' && (!s.requirements || s.interview && s.fingerprint && ['interview', 'reviewAnswers', 'complete'].indexOf(s.stage) >= 0) ||
         task === 'finalize' && (s.stage !== 'reviewAnswers' || token !== journeyToken_(s))) return { unchanged: s };
+    if (task === 'compare') s.requirementsConfirmed = true;
     s.lease = lease; s.busyUntil = Date.now() + 90000; return JSON.parse(JSON.stringify(s));
   });
   if (!snapshot) return jobMessage_('這張舊卡片已失效，請開啟目前職缺。', [['我的職缺', 'jg:resume']]);
@@ -2947,7 +2976,7 @@ function handleJobGuide_(event, text, cfg) {
       row.events = (row.events || []).concat(row.inputEvents || []).filter(function (value, i, all) { return all.indexOf(value) === i; }).slice(-30);
       return row;
     });
-    if (!explicit && (!s || s.paused)) return null;
+    if (!explicit && (!s || s.paused && (s.events || []).indexOf(eventKey_(event)) < 0)) return null;
     var invitation = invitationDraft_(invitationKey_(user, cfg));
     if (invitation && invitation.step < 5) {
       if (command && command[1] === 'invite' && s && s.id === command[2]) return invitation.step < 4 ? invitationPrompt_(invitation) : invitationConfirmation_(invitation);
@@ -3034,7 +3063,7 @@ function handleJobGuide_(event, text, cfg) {
     if (command && command[1] === 'finalize') return journeyRun_(event, cfg, s.id, 'finalize', command[3]);
     if (command && command[1] === 'invite') {
       guideChange_(user, cfg, function (rows, actor) { rows[actor].paused = true; delete rows[actor].lease; delete rows[actor].busyUntil; });
-      return handleContact_(event, 'invite:start', cfg, null);
+      return startJobInvitation_(event, s, cfg);
     }
     if (command && ['answers', 'previous'].indexOf(command[1]) >= 0) {
       var interview = command[1] === 'previous' ? s.previousInterview : s.interview;
@@ -3080,6 +3109,337 @@ function handleJobGuide_(event, text, cfg) {
     }
     return journeySafeRender_(s, cfg);
   } catch (error) { safeLog_('JOB_JOURNEY_' + errorCode_(error)); return journeyError_(error, s); }
+}
+
+
+// ===== Recruiting.gs =====
+/** 招募工作台：資料覆蓋與人工審核，所有候選資料隔離於原訪客的職缺內。 */
+function recruitingAllowed_(quote) { return !/年齡|性別|男女|婚姻|懷孕|宗教|種族|膚色|國籍|星座|血型|身心障礙|身高|體重/.test(quote); }
+function recruitingRequirements_(s) { return s.requirements.filter(function (r) { return recruitingAllowed_(r.quote); }); }
+function recruitingCleanResume_(text) {
+  return text.split('\n').filter(function (line) { return recruitingAllowed_(line) && !/(?:e-?mail|電話|手機|住址|身分證|身份證|生日|出生日期)\s*[:：]/i.test(line); }).join('\n').trim();
+}
+function recruitingStats_(s, candidate) {
+  var requirements = recruitingRequirements_(s), supported = requirements.filter(function (r) { return candidate.results[r.id] && candidate.results[r.id].evidence.length; });
+  var required = requirements.filter(function (r) { return r.kind === '必要'; });
+  return { total: requirements.length, covered: supported.length, rate: requirements.length ? Math.round(supported.length / requirements.length * 100) : null,
+    requiredTotal: required.length, requiredCovered: required.filter(function (r) { return candidate.results[r.id] && candidate.results[r.id].evidence.length; }).length };
+}
+function recruitingButtons_(s) { return [['新增候選人', 'rc:add:' + s.id], ['需求熱圖', 'rc:heat:' + s.id], ['資料覆蓋排序', 'rc:rank:' + s.id],
+  ['候選清單', 'rc:list:' + s.id], ['可預約面談時段', 'slot:list'], ['返回這份職缺', 'jg:resume']]; }
+function recruitingMenu_(s) {
+  var count = Object.keys((s.recruiting || {}).candidates || {}).length;
+  var actions = [['新增候選人', 'rc:add:' + s.id], ['加入此 bot 履歷', 'rc:owner:' + s.id], ['需求熱圖', 'rc:heat:' + s.id], ['資料覆蓋排序', 'rc:rank:' + s.id], ['候選清單／人工決定', 'rc:list:' + s.id], ['返回職缺', 'jg:resume']];
+  var pending = s.recruiting && s.recruiting.input;
+  if (pending) actions.unshift(['取消目前輸入', 'rc:cancel:' + s.id]);
+  return jobMessage_('招募工作台\n' + s.job.split('\n')[0].slice(0, 80) + '\n\n目前 ' + count + ' / 5 位候選人。所有候選人使用同一份職缺條件。\n可逐份貼上已獲授權的履歷文字，或加入這個 bot 的公開履歷。\n\n一般 LINE 使用者彼此分開存取；資料存在 bot 主人的私人 Drive，檔案持有人仍可讀取。\n百分比只計算引文覆蓋率，不是能力分數、適任機率或錄取建議。最後決定由人資人工記錄。',
+    actions);
+}
+function recruitingFresh_(s, cfg) {
+  var candidates = (s.recruiting || {}).candidates || {};
+  Object.keys(candidates).forEach(function (id) { if (candidates[id].kind === 'owner') guideSource_(cfg, candidates[id].fingerprint); });
+}
+function recruitingHeat_(s) {
+  var candidates = Object.keys((s.recruiting || {}).candidates || {}).map(function (id) { return s.recruiting.candidates[id]; });
+  if (!candidates.length) return jobMessage_('先新增候選人，才能產生需求熱圖。', recruitingButtons_(s));
+  var rows = [{ type: 'box', layout: 'horizontal', spacing: 'xs', contents: [{ type: 'text', text: '條件', flex: 2, size: 'xs', weight: 'bold' }].concat(candidates.map(function (c, i) {
+    return { type: 'text', text: 'C' + (i + 1), flex: 1, align: 'center', size: 'xs', weight: 'bold' };
+  })) }];
+  s.requirements.forEach(function (r, i) {
+    rows.push({ type: 'box', layout: 'horizontal', spacing: 'xs', margin: 'sm', contents: [{ type: 'text', text: 'R' + (i + 1), flex: 2, size: 'xs' }].concat(candidates.map(function (c) {
+      var allowed = recruitingAllowed_(r.quote), supported = allowed && c.results[r.id] && c.results[r.id].evidence.length;
+      return { type: 'box', layout: 'vertical', flex: 1, cornerRadius: '4px', paddingAll: '4px', backgroundColor: !allowed ? '#E5E7EB' : supported ? '#DCFCE7' : '#FEF3C7',
+        contents: [{ type: 'text', text: !allowed ? '排除' : supported ? '原文' : '待查', size: 'xxs', align: 'center', color: '#1F2937' }] };
+    })) });
+  });
+  return [jobMessage_('需求熱圖｜綠：有可核對原文；黃：待確認；灰：不納入評估。\n顏色不代表能力高低。\n\n' + candidates.map(function (c, i) { return 'C' + (i + 1) + '：' + c.name; }).join('\n') + '\n\n' +
+    s.requirements.map(function (r, i) { return 'R' + (i + 1) + ' [' + r.kind + '] ' + r.quote; }).join('\n'), recruitingButtons_(s))[0],
+    { type: 'flex', altText: '需求熱圖：資料支持狀態，非能力評分', contents: { type: 'bubble', size: 'mega', body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: rows } } }];
+}
+function recruitingCompare_(s) {
+  var candidates = Object.keys((s.recruiting || {}).candidates || {}).map(function (id, i) { var c = s.recruiting.candidates[id]; return { c: c, stats: recruitingStats_(s, c), order: i }; });
+  candidates.sort(function (a, b) { return b.stats.requiredCovered - a.stats.requiredCovered || (b.stats.rate || 0) - (a.stats.rate || 0) || a.order - b.order; });
+  return jobMessage_('候選資料覆蓋排序｜供人工查閱\n\n' + (candidates.length ? candidates.map(function (entry, i) {
+    return (i + 1) + '. ' + entry.c.name + '\n必要條件原文：' + entry.stats.requiredCovered + '/' + entry.stats.requiredTotal +
+      '；全部條件原文：' + entry.stats.covered + '/' + entry.stats.total + '（' + (entry.stats.rate === null ? '不計算' : entry.stats.rate + '%') + '）\n人工決定：' + (entry.c.decision ? entry.c.decision.label : '尚未審核');
+  }).join('\n\n') : '尚無候選人。') + '\n\n排序先看必要條件的原文筆數，再看全部資料覆蓋率；同分維持加入順序。履歷寫得多不等於能力較強，缺資料也不代表不會。不自動淘汰或錄取。', recruitingButtons_(s));
+}
+function recruitingEvaluate_(s, resume, cfg) {
+  var lines = [];
+  resume.split(/\n+/).filter(Boolean).forEach(function (line) { for (var i = 0; i < line.length; i += 600) lines.push({ id: 'C' + (lines.length + 1), text: line.slice(i, i + 600) }); });
+  var requirements = recruitingRequirements_(s);
+  if (!requirements.length) throw new Error('RECRUITING_NO_JOB_CRITERIA');
+  var value = guideModel_({ requirements: requirements, resume: lines }, { type: 'OBJECT', properties: {
+    candidateEvidence: { type: 'ARRAY', items: { type: 'OBJECT', properties: { requirementId: { type: 'STRING' }, evidence: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
+      lineId: { type: 'STRING' }, quote: { type: 'STRING' }
+    }, required: ['lineId', 'quote'] } } }, required: ['requirementId', 'evidence'] } }
+  }, required: ['candidateEvidence'] },
+  '只整理每項工作條件的相關原文，每項回傳一筆 candidateEvidence，最多兩則引文；lineId 必須存在，quote 逐字摘錄該片段的連續原文，4～160 字，保留否定、限制及實際角色。沒有直接相關依據就 evidence=[]。不得推論能力分數、符合機率、人格、年齡、性別等無關特徵或錄取決定。不要因為工具名稱而推定年資、主導角色或實績。', cfg);
+  if (!value || !Array.isArray(value.candidateEvidence) || value.candidateEvidence.length !== requirements.length) throw new Error('RECRUITING_INVALID_FORMAT');
+  var results = {};
+  value.candidateEvidence.forEach(function (item) {
+    if (!item || !requirements.some(function (r) { return r.id === item.requirementId; }) || results[item.requirementId] || !Array.isArray(item.evidence) || item.evidence.length > 2) throw new Error('RECRUITING_INVALID_FORMAT');
+    var seen = {};
+    results[item.requirementId] = { evidence: item.evidence.map(function (e) {
+      var line = e && lines.find(function (l) { return l.id === e.lineId; });
+      if (!line || seen[e.lineId] || typeof e.quote !== 'string' || e.quote.length < 4 || e.quote.length > 160 || line.text.indexOf(e.quote) < 0) throw new Error('GUIDE_INVALID_QUOTE');
+      seen[e.lineId] = true; return { id: line.id, quote: e.quote, section: '人資提供的履歷片段 ' + line.id };
+    }) };
+  });
+  return results;
+}
+function recruitingView_(s, c) {
+  var stats = recruitingStats_(s, c);
+  return journeyTextMessages_(c.name + '\n資料來源：' + (c.kind === 'owner' ? '此 bot 公開履歷' : '人資提供文字，尚未查證真實性') + '\n證據覆蓋率：' + (stats.rate === null ? '不計算' : stats.rate + '%') + '\n\n' +
+    s.requirements.map(function (r, i) { return (i + 1) + '. ' + r.quote + '\n' + (!recruitingAllowed_(r.quote) ? '不納入評估。' :
+      c.results[r.id] && c.results[r.id].evidence.length ? c.results[r.id].evidence.map(function (e) { return '「' + e.quote + '」\n來源：' + e.section; }).join('\n') : '待確認；未記載不代表不具備。'); }).join('\n\n') +
+    '\n\n人工決定：' + (c.decision ? c.decision.label + '\n理由：' + c.decision.reason : '尚未審核') +
+    (c.previousDecision ? '\n前次決定（來源更新後需重審）：' + c.previousDecision.label + '；' + c.previousDecision.reason : '') + '\n系統不自動決定錄取或淘汰。',
+    [['查看提供的履歷', 'rc:source:' + s.id + ':' + c.id], ['記錄人工決定', 'rc:decision:' + s.id + ':' + c.id], ['刪除候選資料', 'rc:delete:' + s.id + ':' + c.id], ['返回工作台', 'rc:menu']]);
+}
+
+function handleRecruiting_(event, text, cfg) {
+  var aliases = { '招募工作台': 'menu', '需求熱圖': 'heat', '候選比較': 'rank', '候選清單': 'list' };
+  var alias = Object.prototype.hasOwnProperty.call(aliases, text) ? aliases[text] : '';
+  var user = event.source.userId, explicit = /^rc:/.test(text) || !!alias, parts = text.split(':'), s;
+  try {
+    s = guideRead_(user, cfg); if (s && s.expired) { guideChange_(user, cfg, function () {}); s = null; }
+    if (s && s.recruiting && s.recruiting.lastEvent === eventKey_(event)) return recruitingMenu_(s);
+    if (s && s.recruiting && s.recruiting.lastReasonEvent === eventKey_(event)) {
+      var pendingDecision = s.recruiting.input;
+      if (pendingDecision && pendingDecision.kind === 'decision' && pendingDecision.reason) return jobMessage_('請確認人工決定與理由：\n' + pendingDecision.reason,
+        [['確認記錄', 'rc:confirm:' + s.id + ':' + pendingDecision.candidateId + ':' + pendingDecision.token], ['返回清單', 'rc:list:' + s.id]]);
+      return recruitingMenu_(s);
+    }
+    var input = s && s.recruiting && s.recruiting.input;
+    if (!explicit && !input) return null;
+    if (invitationDraft_(invitationKey_(user, cfg)) && invitationDraft_(invitationKey_(user, cfg)).step < 5) return explicit ? jobMessage_('請先完成或取消目前邀約。') : null;
+    if (!s || !s.requirements || !s.requirementsConfirmed && !s.fingerprint) return explicit ? jobMessage_('先貼職缺並確認條件，再開啟招募工作台。', [['貼職缺', 'jg:start']]) : null;
+    if (explicit && parts[2] && parts[2] !== s.id) return jobMessage_('這個按鈕屬於舊職缺，請開啟目前工作台。', [['招募工作台', 'rc:menu']]);
+    if (!explicit && (/^(?:jg:|jm:|slot:|invite:|nav:|topic:|work:)/.test(text) || /^(首頁|取消|看履歷|貼職缺|聯繫邀約)$/.test(text))) {
+      guideChange_(user, cfg, function (rows, actor) { if (rows[actor].recruiting) { delete rows[actor].recruiting.input; delete rows[actor].recruiting.lease; delete rows[actor].recruiting.busyUntil; } });
+      return text === '取消' ? recruitingMenu_(s) : null;
+    }
+    if (input && input.expiresAt <= Date.now()) { guideChange_(user, cfg, function (rows, actor) { delete rows[actor].recruiting.input; }); return jobMessage_('輸入已過期，剛才內容未送給 AI。', [['招募工作台', 'rc:menu']]); }
+    var action = explicit ? parts[1] || 'menu' : '';
+    if (alias) action = alias;
+    if (action === 'cancel') { guideChange_(user, cfg, function (rows, actor) { if (rows[actor].recruiting) { delete rows[actor].recruiting.input; delete rows[actor].recruiting.lease; delete rows[actor].recruiting.busyUntil; } }); return recruitingMenu_(guideRead_(user, cfg)); }
+    if (action === 'menu') return recruitingMenu_(s);
+    if (action === 'list') {
+      var all = Object.keys((s.recruiting || {}).candidates || {}).map(function (id) { return s.recruiting.candidates[id]; });
+      return jobMessage_(all.length ? '選擇候選人查看原文與人工決定。' : '尚未新增候選人。', all.map(function (c, i) { return [(i + 1) + '. ' + c.name.slice(0, 15), 'rc:view:' + s.id + ':' + c.id]; }).concat([['新增候選人', 'rc:add:' + s.id], ['返回工作台', 'rc:menu']]));
+    }
+    if (action === 'heat' || action === 'rank') { recruitingFresh_(s, cfg); return action === 'heat' ? recruitingHeat_(s) : recruitingCompare_(s); }
+    if (action === 'add') {
+      if (Object.keys((s.recruiting || {}).candidates || {}).length >= 5) return jobMessage_('每份職缺最多五位候選人，請先刪除不再使用的資料。', recruitingButtons_(s));
+      guideChange_(user, cfg, function (rows, actor) { var row = rows[actor]; row.recruiting = row.recruiting || { candidates: {} }; row.recruiting.input = { kind: 'resume', expiresAt: Date.now() + 1800000 }; row.paused = true; });
+      return jobMessage_('請貼上已獲授權的履歷文字，最多 4000 字：\n\n候選人代號：候選 A\n履歷：\n專案、本人負責內容、技能與成果……\n\n只貼與工作有關的資料；姓名可用代號。文字將交由 Gemini 找引文，與目前職缺一起私人保存 24 小時，不公開、不寫入原履歷。輸入「取消」離開。');
+    }
+    if (action === 'owner') {
+      guideSource_(cfg, s.fingerprint);
+      if (!s.fingerprint || !s.results || Object.keys(s.results).length !== s.requirements.length) return jobMessage_('請先完成此履歷的證據比對。', [['繼續職缺', 'jg:resume']]);
+      var ownerId = sha256_('owner:' + s.id).slice(0, 16);
+      var added = guideChange_(user, cfg, function (rows, actor) { var row = rows[actor]; row.recruiting = row.recruiting || { candidates: {} };
+        var previous = row.recruiting.candidates[ownerId];
+        if (!previous && Object.keys(row.recruiting.candidates).length >= 5) return false;
+        if (previous && previous.fingerprint === s.fingerprint) return true;
+        row.recruiting.candidates[ownerId] = { id: ownerId, kind: 'owner', name: cfg.name.slice(0, 40), fingerprint: s.fingerprint, results: s.results, createdAt: Date.now() };
+        if (previous && previous.decision) row.recruiting.candidates[ownerId].previousDecision = previous.decision;
+        return true; });
+      return added ? recruitingMenu_(guideRead_(user, cfg)) : jobMessage_('已達五位候選人上限，未加入此 bot 履歷。', recruitingButtons_(s));
+    }
+    var candidate = (s.recruiting || {}).candidates && s.recruiting.candidates[parts[3]];
+    if (['view', 'source', 'decision', 'choose', 'confirm', 'delete', 'deleteyes'].indexOf(action) >= 0 && !candidate) return jobMessage_('找不到這份職缺的候選資料。', [['候選清單', 'rc:list:' + s.id]]);
+    if (candidate && candidate.kind === 'owner' && ['view', 'source', 'decision', 'choose', 'confirm'].indexOf(action) >= 0) guideSource_(cfg, candidate.fingerprint);
+    if (action === 'source') return candidate.kind === 'owner' ? recruitingView_(s, candidate) : journeyTextMessages_('人資提供的履歷文字（已排除部分無關個資，真實性待查證）\n\n' + candidate.source, [['返回候選資料', 'rc:view:' + s.id + ':' + candidate.id]]);
+    if (action === 'view') { recruitingFresh_(s, cfg); return recruitingView_(s, candidate); }
+    var choices = { interview: '邀請面談', hold: '待補充', reject: '不續辦', offer: '錄取（人工記錄）' };
+    if (action === 'decision') return jobMessage_('由你人工決定 ' + candidate.name + ' 的下一步；系統只記錄，不自動通知候選人。', Object.keys(choices).map(function (key) { return [choices[key], 'rc:choose:' + s.id + ':' + candidate.id + ':' + key]; }).concat([['返回', 'rc:view:' + s.id + ':' + candidate.id]]));
+    if (action === 'choose' && Object.prototype.hasOwnProperty.call(choices, parts[4])) {
+      guideChange_(user, cfg, function (rows, actor) { rows[actor].recruiting.input = { kind: 'decision', candidateId: candidate.id, choice: parts[4], expiresAt: Date.now() + 1800000 }; rows[actor].paused = true; });
+      return jobMessage_('請輸入與職務相關的人工判斷理由（4～300 字）。這段理由不交給 AI；下一步仍需確認。輸入「取消」離開。');
+    }
+    if (action === 'confirm') {
+      if (!input || input.kind !== 'decision' || input.candidateId !== candidate.id || !input.reason || input.token !== parts[4]) return jobMessage_('這份人工決定已失效，請重新審核。', [['查看候選人', 'rc:view:' + s.id + ':' + candidate.id]]);
+      guideChange_(user, cfg, function (rows, actor) { var row = rows[actor]; row.recruiting.candidates[candidate.id].decision = { label: choices[input.choice], reason: input.reason, recordedAt: new Date().toISOString(), by: '人資人工確認' }; delete row.recruiting.input; });
+      return recruitingView_(guideRead_(user, cfg), guideRead_(user, cfg).recruiting.candidates[candidate.id]);
+    }
+    if (action === 'delete') return jobMessage_('刪除 ' + candidate.name + ' 的比較資料？不會自動取消既有預約。', [['確認刪除', 'rc:deleteyes:' + s.id + ':' + candidate.id], ['保留', 'rc:list:' + s.id]]);
+    if (action === 'deleteyes') { guideChange_(user, cfg, function (rows, actor) { delete rows[actor].recruiting.candidates[candidate.id]; }); return recruitingMenu_(guideRead_(user, cfg)); }
+    if (!explicit && input && event.type === 'message') {
+      if (input.kind === 'decision') {
+        if (text.length < 4 || text.length > 300 || !recruitingAllowed_(text)) return jobMessage_('請以 4～300 字說明與工作相關的依據，勿使用年齡、性別等無關特徵。');
+        var token = sha256_(Utilities.getUuid()).slice(0, 12);
+        guideChange_(user, cfg, function (rows, actor) { rows[actor].recruiting.input.reason = text; rows[actor].recruiting.input.token = token; rows[actor].recruiting.lastReasonEvent = eventKey_(event); journeyRemember_(rows[actor], event); });
+        return jobMessage_('請確認人工決定：' + choices[input.choice] + '\n理由：' + text + '\n不會自動通知候選人。', [['確認記錄', 'rc:confirm:' + s.id + ':' + input.candidateId + ':' + token], ['返回候選清單', 'rc:list:' + s.id]]);
+      }
+      if (text.length > 4000) return jobMessage_('履歷文字最多 4000 字，請縮短後再貼，不會默默截斷。');
+      var match = /^候選人(?:代號|姓名)?\s*[:：]\s*([^\n]{1,40})\n履歷\s*[:：]\s*([\s\S]+)$/.exec(text);
+      if (!match) return jobMessage_('請依格式貼上：\n候選人代號：候選 A\n履歷：\n與工作相關的經驗、專案與成果。');
+      var resume = recruitingCleanResume_(match[2]); if (resume.length < 20) return jobMessage_('可用的工作經驗資料不足 20 字，請補充；無關個資不納入評估。');
+      var signature = sha256_(JSON.stringify(s.requirements)), lease = Utilities.getUuid(), reserved = guideChange_(user, cfg, function (rows, actor) { var row = rows[actor]; if (row.id !== s.id || row.recruiting.busyUntil > Date.now() || Object.keys(row.recruiting.candidates).length >= 5) return false;
+        if (row.recruiting.lastEvent === eventKey_(event)) return false; row.recruiting.lease = lease; row.recruiting.busyUntil = Date.now() + 90000; return true; });
+      if (!reserved) return jobMessage_('正在處理或候選數量已滿，請查看目前清單。', [['候選清單', 'rc:list:' + s.id]]);
+      var results, error; try { startLoading_(user, cfg); results = recruitingEvaluate_(s, resume, cfg); } catch (e) { error = e; }
+      var saved = guideChange_(user, cfg, function (rows, actor) { var row = rows[actor]; if (!row || row.id !== s.id || !row.recruiting || row.recruiting.lease !== lease) return null;
+        delete row.recruiting.lease; delete row.recruiting.busyUntil;
+        if (sha256_(JSON.stringify(row.requirements)) !== signature) return null;
+        if (!error) { var id = sha256_(Utilities.getUuid()).slice(0, 16); row.recruiting.candidates[id] = { id: id, name: match[1].trim(), kind: 'text', source: resume, results: results, createdAt: Date.now() }; row.recruiting.lastEvent = eventKey_(event); journeyRemember_(row, event); delete row.recruiting.input; }
+        return row; });
+      if (!saved) return jobMessage_('操作已取消或職缺條件已變更，未加入舊請求結果。', [['招募工作台', 'rc:menu']]);
+      if (error) { safeLog_('RECRUITING_' + errorCode_(error)); return jobMessage_(/^GEMINI_HTTP_/.test(errorCode_(error)) ? ragErrorMessage_(error) : '候選資料引用或格式未通過核對，尚未加入；可重貼同一份資料重試。'); }
+      return recruitingMenu_(saved);
+    }
+    return recruitingMenu_(s);
+  } catch (error) { safeLog_('RECRUITING_' + errorCode_(error)); return jobMessage_(errorCode_(error) === 'GUIDE_STALE_SOURCE' ? '原履歷已更新，請重新比對並更新此 bot 候選資料後再比較。' : '工作台暫時無法完成，請稍後重試。', [['招募工作台', 'rc:menu']]); }
+}
+
+/** 預填可修改的摘要；完整職缺隨確認保存，不把三題原始回答默默寄出。 */
+function startJobInvitation_(event, s, cfg) {
+  guideSource_(cfg, s.fingerprint);
+  var key = invitationKey_(event.source.userId, cfg), existing = invitationDraft_(key);
+  if (existing && existing.step < 5) return existing.step < 4 ? invitationPrompt_(existing) : invitationConfirmation_(existing);
+  handleContact_(event, 'invite:start', cfg, null);
+  var draft = invitationDraft_(key); if (!draft) return jobMessage_('邀約草稿未能建立，請稍後再試。');
+  var summary = s.job.split('\n')[0].slice(0, 100) + '\n\n職缺對照重點：\n' + s.requirements.map(function (r) {
+    return '• ' + r.quote.slice(0, 50) + (r.quote.length > 50 ? '…' : '') + '：' + (s.results[r.id] && s.results[r.id].evidence.length ? '有相關原文，需核對' : '待確認');
+  }).join('\n');
+  if (s.interview && s.interview.followups) summary += '\n\n想先請教本人的問題：\n' + s.interview.followups.slice(0, 2).map(function (q) { return '• ' + q.text.slice(0, 85) + (q.text.length > 85 ? '…' : ''); }).join('\n');
+  if (summary.length > 760) summary = summary.slice(0, 730) + '\n（摘要節錄，原職缺另保存）';
+  draft.fields.message = summary; draft.prefilled = true; draft.context = { job: s.job, jobId: s.id, sourceFingerprint: s.fingerprint };
+  CacheService.getScriptCache().put(key, JSON.stringify(draft), 1800);
+  return [jobMessage_('已帶入職稱、對照摘要及待確認問題。先填公司與稱呼；送出前可預覽及修改。原職缺會隨邀約保存，原始三題回答不會自動寄出。')[0]].concat(invitationPrompt_(draft));
+}
+
+
+// ===== Scheduling.gs =====
+/** 此 bot 的共享時段表；不讀寫 Google Calendar。所有保留／預訂在指令碼鎖內完成。 */
+function schedulingData_(store) {
+  var data = store.scheduling || (store.scheduling = { slots: {}, bookings: {}, inputs: {} }), now = Date.now();
+  Object.keys(data.slots).forEach(function (id) { var slot = data.slots[id]; if (slot.hold && slot.hold.until <= now) delete slot.hold;
+    if (Date.parse(slot.end) < now - 30 * 86400000) delete data.slots[id]; });
+  Object.keys(data.bookings).forEach(function (id) { if (Date.parse(data.bookings[id].end) < now - 30 * 86400000) delete data.bookings[id]; });
+  Object.keys(data.inputs).forEach(function (id) { if (data.inputs[id].expiresAt <= now) delete data.inputs[id]; });
+  return data;
+}
+function schedulingChange_(cfg, change, alreadyLocked) {
+  if (alreadyLocked) { var store = loadPortfolioStore_(cfg), result = change(schedulingData_(store), store); savePortfolioStore_(store, cfg); return result; }
+  return updatePortfolioStore_(cfg, function (store) { return change(schedulingData_(store), store); });
+}
+function schedulingLabel_(slot) {
+  return Utilities.formatDate(new Date(slot.start), 'Asia/Taipei', 'yyyy-MM-dd HH:mm') + '～' + Utilities.formatDate(new Date(slot.end), 'Asia/Taipei', 'HH:mm') + '（台北時間）';
+}
+function schedulingParse_(text) {
+  var match = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\s*\/\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})$/.exec(text);
+  if (!match) throw new Error('SLOT_INVALID_TIME');
+  var times = match.slice(1).map(function (part) { var time = Date.parse(part.replace(' ', 'T') + ':00+08:00');
+    if (!Number.isFinite(time) || new Date(time + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ') !== part) throw new Error('SLOT_INVALID_TIME'); return time; });
+  if (times[0] <= Date.now() || times[0] > Date.now() + 90 * 86400000 || times[1] - times[0] < 15 * 60000 || times[1] - times[0] > 180 * 60000) throw new Error('SLOT_INVALID_TIME');
+  return { start: new Date(times[0]).toISOString(), end: new Date(times[1]).toISOString() };
+}
+function releaseInterviewHold_(user, draft, cfg, alreadyLocked) {
+  if (!draft || !draft.slotId) return;
+  schedulingChange_(cfg, function (data) { var slot = data.slots[draft.slotId];
+    if (slot && slot.hold && slot.hold.actor === invitationVisitor_(user) && slot.hold.draftId === draft.id) delete slot.hold;
+  }, alreadyLocked);
+}
+/** 必須與邀約紀錄共用同一次 savePortfolioStore_，不能先預訂後另存邀約。 */
+function commitInterviewBooking_(store, draft, record, user) {
+  if (!draft.slotId) return true;
+  var data = schedulingData_(store), slot = data.slots[draft.slotId], actor = invitationVisitor_(user);
+  if (!slot || !slot.open || slot.bookingId || Date.parse(slot.start) <= Date.now() || !slot.hold || slot.hold.actor !== actor || slot.hold.draftId !== draft.id || slot.hold.until <= Date.now()) return false;
+  var booking = { id: record.id, slotId: slot.id, actor: actor, start: slot.start, end: slot.end, status: 'reserved', createdAt: new Date().toISOString() };
+  slot.bookingId = record.id; delete slot.hold; data.bookings[record.id] = booking;
+  record.booking = { slotId: slot.id, start: slot.start, end: slot.end, status: 'reserved' };
+  record.fields.availability = schedulingLabel_(slot); return true;
+}
+function schedulingList_(user, cfg) {
+  var actor = invitationVisitor_(user), draft = invitationDraft_(invitationKey_(user, cfg));
+  var slots = schedulingChange_(cfg, function (data) { return Object.keys(data.slots).map(function (id) { return data.slots[id]; }).filter(function (slot) {
+    return slot.open && !slot.bookingId && Date.parse(slot.start) > Date.now() && (!slot.hold || slot.hold.actor === actor && draft && slot.hold.draftId === draft.id);
+  }).sort(function (a, b) { return Date.parse(a.start) - Date.parse(b.start); }).slice(0, 10); });
+  var actions = slots.map(function (slot, i) { return ['選時段 ' + (i + 1), 'slot:pick:' + slot.id + (draft && draft.step < 5 ? ':' + draft.id : '')]; });
+  actions.push(['我的預約', 'slot:mine']); if (user === ownerLineUserId_()) actions.push(['管理時段', 'slot:admin']);
+  return jobMessage_(slots.length ? '可面談時段\n' + slots.map(function (slot, i) { return (i + 1) + '. ' + schedulingLabel_(slot); }).join('\n') +
+    '\n\n選擇後暫留五分鐘；仍需填寫並確認邀約，才會登記預約。此表只管理本 bot，未同步其他行事曆。' : '目前沒有可預約時段。仍可留下邀約，填寫方便聯繫的時間。', actions);
+}
+function handleScheduling_(event, text, cfg) {
+  var user = event.source.userId, actor = invitationVisitor_(user), parts = text.split(':'), explicit = /^slot:/.test(text) || /^(管理面談時段|預約面談|我的預約)$/.test(text);
+  try {
+    var store = loadPortfolioStore_(cfg), priorInput = store.scheduling && store.scheduling.inputs && store.scheduling.inputs[actor];
+    var data = schedulingData_(store), input = data.inputs[actor];
+    if (!explicit && priorInput && priorInput.expiresAt <= Date.now()) {
+      schedulingChange_(cfg, function () {});
+      return jobMessage_('新增時段的輸入已過期，剛才文字未送給 AI，也未發布時段。請重新開啟設定。', [['管理時段', 'slot:admin']]);
+    }
+    if (!explicit && !input) return null;
+    var action = parts[1] || 'list';
+    if (text === '管理面談時段') action = 'admin'; if (text === '預約面談') action = 'list'; if (text === '我的預約') action = 'mine';
+    if (['pick', 'close', 'closeyes'].indexOf(action) >= 0 && !/^[a-f0-9]{16}$/.test(parts[2] || '')) return jobMessage_('時段按鈕已失效，請重新選擇。', [['查看時段', 'slot:list']]);
+    if (['cancel', 'cancelok'].indexOf(action) >= 0 && !/^[a-f0-9]{32}$/.test(parts[2] || '')) return jobMessage_('預約按鈕已失效，請重新開啟。', [['我的預約', 'slot:mine']]);
+    var owner = user === ownerLineUserId_();
+    if (!explicit && /^(取消|首頁)$|^(jg:|rc:|invite:|nav:)/.test(text)) { schedulingChange_(cfg, function (d) { delete d.inputs[actor]; }); return text === '取消' ? jobMessage_('已取消新增時段。', [['管理時段', 'slot:admin']]) : null; }
+    if (!explicit && input) {
+      if (!owner || input.kind !== 'slot') return jobMessage_('設定已失效，請重新開啟。');
+      var times; try { times = schedulingParse_(text); } catch (_) { return jobMessage_('時間格式或範圍不正確。請輸入：\nYYYY-MM-DD HH:mm / YYYY-MM-DD HH:mm\n台北時間，未來 90 天內，長度 15～180 分鐘。'); }
+      var outcome = schedulingChange_(cfg, function (d) {
+        var all = Object.keys(d.slots).map(function (id) { return d.slots[id]; });
+        if (all.filter(function (slot) { return slot.open && Date.parse(slot.end) > Date.now(); }).length >= 30) return 'capacity';
+        if (all.some(function (slot) { return (slot.open || slot.bookingId) && Date.parse(times.start) < Date.parse(slot.end) && Date.parse(times.end) > Date.parse(slot.start); })) return 'overlap';
+        var id = sha256_(Utilities.getUuid()).slice(0, 16); d.slots[id] = { id: id, start: times.start, end: times.end, open: true }; delete d.inputs[actor]; return 'saved';
+      });
+      return jobMessage_(outcome === 'saved' ? '已發布面談時段：' + schedulingLabel_(times) : outcome === 'overlap' ? '與已發布或已預訂時段重疊，尚未新增。請換一個時段。' : '最多三十個未來時段，請先關閉不再使用的時段。', [['管理時段', 'slot:admin']]);
+    }
+    if (action === 'list') return schedulingList_(user, cfg);
+    if (['admin', 'add', 'close', 'closeyes'].indexOf(action) >= 0 && !owner) return jobMessage_('只有已設定的履歷本人帳號可以管理時段。請由本人設定 OWNER_LINE_USER_ID。');
+    if (action === 'admin') {
+      var all = Object.keys(data.slots).map(function (id) { return data.slots[id]; }).filter(function (slot) { return Date.parse(slot.end) > Date.now(); }).sort(function (a, b) { return Date.parse(a.start) - Date.parse(b.start); });
+      return jobMessage_('本人時段管理\n' + (all.length ? all.map(function (slot, i) { return (i + 1) + '. ' + schedulingLabel_(slot) + '｜' + (slot.bookingId ? '已預訂' : slot.hold ? '暫留中' : slot.open ? '開放' : '關閉'); }).join('\n') : '尚未發布時段。') +
+        '\n已預訂時段需先取消預約才能關閉。未同步 Google Calendar。', [['新增時段', 'slot:add'], ['全部預約', 'slot:mine']].concat(all.filter(function (slot) { return slot.open && !slot.bookingId; }).slice(0, 8).map(function (slot, i) { return ['關閉可用時段 ' + (i + 1), 'slot:close:' + slot.id]; })));
+    }
+    if (action === 'add') {
+      guideChange_(user, cfg, function (rows, key) { if (rows[key]) { rows[key].paused = true; if (rows[key].recruiting) delete rows[key].recruiting.input; } });
+      schedulingChange_(cfg, function (d) { d.inputs[actor] = { kind: 'slot', expiresAt: Date.now() + 1800000 }; });
+      return jobMessage_('請輸入起訖時間：\nYYYY-MM-DD HH:mm / YYYY-MM-DD HH:mm\n使用台北時間，未來 90 天內，長度 15～180 分鐘。輸入「取消」離開。');
+    }
+    if (action === 'close') return jobMessage_('確認關閉這個時段？其他人將無法選擇。', [['確認關閉', 'slot:closeyes:' + parts[2]], ['保留', 'slot:admin']]);
+    if (action === 'closeyes') {
+      var closed = schedulingChange_(cfg, function (d) { var slot = d.slots[parts[2]]; if (!slot || slot.bookingId) return false; slot.open = false; delete slot.hold; return true; });
+      return jobMessage_(closed ? '已關閉時段。' : '時段不存在或已預訂，尚未關閉。', [['管理時段', 'slot:admin']]);
+    }
+    if (action === 'pick') {
+      var draft = invitationDraft_(invitationKey_(user, cfg));
+      if (parts[3] && (!draft || draft.id !== parts[3] || draft.step >= 5)) return jobMessage_('這張選時段卡片已失效，請重新選擇。', [['查看時段', 'slot:list']]);
+      if (!draft || draft.step >= 5) { handleContact_(event, 'invite:start', cfg, null); draft = invitationDraft_(invitationKey_(user, cfg)); }
+      if (!draft) return jobMessage_('邀約草稿未能建立，請稍後再試。');
+      var slot = schedulingChange_(cfg, function (d) {
+        var target = d.slots[parts[2]];
+        if (!target || !target.open || target.bookingId || Date.parse(target.start) <= Date.now() || target.hold && (target.hold.actor !== actor || target.hold.draftId !== draft.id)) return null;
+        Object.keys(d.slots).forEach(function (id) { var previous = d.slots[id]; if (previous.hold && previous.hold.actor === actor && previous.hold.draftId === draft.id) delete previous.hold; });
+        target.hold = { actor: actor, draftId: draft.id, until: Date.now() + 300000 }; return target;
+      });
+      if (!slot) return jobMessage_('此時段剛被保留、預訂或關閉，沒有建立你的預約。請選其他時間。', [['重新選時段', 'slot:list']]);
+      draft.slotId = slot.id; draft.fields.availability = schedulingLabel_(slot); if (draft.step === 3) draft.step = 4;
+      CacheService.getScriptCache().put(invitationKey_(user, cfg), JSON.stringify(draft), 1800);
+      return [jobMessage_('已暫留五分鐘：' + schedulingLabel_(slot) + '\n請完成邀約並確認送出，才會登記預約。')[0]].concat(draft.step === 4 ? invitationConfirmation_(draft) : invitationPrompt_(draft));
+    }
+    if (action === 'mine') {
+      var bookings = Object.keys(data.bookings).map(function (id) { return data.bookings[id]; }).filter(function (b) { return owner || b.actor === actor; }).sort(function (a, b) { return Date.parse(a.start) - Date.parse(b.start); });
+      return jobMessage_((owner ? '全部預約' : '我的預約') + '\n' + (bookings.length ? bookings.map(function (b, i) { return (i + 1) + '. ' + schedulingLabel_(b) + '｜' + (b.status === 'cancelled' ? '已取消' : '已保留，待確認細節'); }).join('\n') : '尚無預約。'),
+        bookings.filter(function (b) { return b.status === 'reserved'; }).slice(0, 10).map(function (b, i) { return ['取消預約 ' + (i + 1), 'slot:cancel:' + b.id]; }).concat([['查看可用時段', 'slot:list']]));
+    }
+    if (action === 'cancel' || action === 'cancelok') {
+      var booking = data.bookings[parts[2]];
+      if (!booking || !owner && booking.actor !== actor) return jobMessage_('找不到你可管理的預約。');
+      if (action === 'cancel') return jobMessage_('取消 ' + schedulingLabel_(booking) + ' 的預約？確認後釋放時段，請自行與對方確認取消細節。', [['確認取消', 'slot:cancelok:' + booking.id], ['保留預約', 'slot:mine']]);
+      schedulingChange_(cfg, function (d, store) { var b = d.bookings[parts[2]]; if (!b || !owner && b.actor !== actor) return; b.status = 'cancelled';
+        var slot = d.slots[b.slotId]; if (slot && slot.bookingId === b.id) delete slot.bookingId;
+        var invitation = (store.invitations || {})[b.id]; if (invitation && invitation.booking) { invitation.booking.status = 'cancelled'; invitation.fields.availability = schedulingLabel_(b) + '（預約已取消）'; }
+      });
+      return jobMessage_('已取消預約並釋放時段。系統未自動寄送取消通知，請自行告知對方。', [['我的預約', 'slot:mine']]);
+    }
+    return schedulingList_(user, cfg);
+  } catch (error) { safeLog_('SCHEDULING_' + errorCode_(error)); return jobMessage_('時段操作未能確認完成，請重新查看狀態。', [['我的預約', 'slot:mine'], ['查看時段', 'slot:list']]); }
 }
 
 
@@ -3556,6 +3916,8 @@ function handleEvent_(event, cfg) {
     if (text === '看履歷') text = 'topic:' + visibleMenuTopics_()[1].id;
     if (text === '聯繫邀約') text = 'nav:contact';
     if (!cfg.enabled) messages = [textMessage_('履歷助理目前暫停服務，請稍後再試。')];
+    else if ((messages = handleScheduling_(event, text, cfg))) { /* 共用時段表與本人管理。 */ }
+    else if ((messages = handleRecruiting_(event, text, cfg))) { /* 人資私人比較工作台。 */ }
     else if ((messages = handleJobGuide_(event, text, cfg))) { /* 職缺證據導覽不需要角色切換。 */ }
     else if ((messages = handleContact_(event, text, cfg, prepared))) { /* 聯繫與邀約不經 RAG。 */ }
     else if (/^(清除對話|重新開始|reset)$/i.test(text)) {

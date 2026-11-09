@@ -120,8 +120,8 @@ for (const mode of [undefined, 'bundle']) test('result-to-invitation keeps confi
   const home = send('首頁')[0]; assert.deepEqual([...home.contents.contents[0].footer.contents.map(b => b.action.label)], ['看履歷', '貼職缺', '聯繫邀約']);
   assert.match(output(send('模擬人資')), /不需要角色切換/); assert.equal(f.read().id, s.id);
   assert.match(output(f.step('jg:invite:' + s.id)), /公司／單位與您的稱呼/); send('測試公司');
-  assert.equal(f.gas.invitationDraft_(f.gas.invitationKey_('hr', f.gas.config_())).step, 1);
-  f.step('jg:invite:' + s.id); assert.equal(f.gas.invitationDraft_(f.gas.invitationKey_('hr', f.gas.config_())).step, 1);
+  assert.equal(f.gas.invitationDraft_(f.gas.invitationKey_('hr', f.gas.config_())).step, 2);
+  f.step('jg:invite:' + s.id); assert.equal(f.gas.invitationDraft_(f.gas.invitationKey_('hr', f.gas.config_())).step, 2);
   assert(!f.state.calls.some(c => c.url.endsWith('/push')));
 });
 test('only approved cited work previews appear; expiry intercepts leftover private answers', () => {

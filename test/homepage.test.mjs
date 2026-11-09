@@ -80,7 +80,7 @@ test('missing portrait uses a self-contained geometric person and never changes 
  assert.equal(f.state.documentWrites,writes);assert(!calls.some(c=>c.url.includes('generativelanguage')||c.url.includes('/content')));
 });
 
-test('home aliases and the persistent card button can reopen all three cards repeatedly after an existing conversation',()=>{
+test('home aliases and legacy home postbacks reopen all three cards after an existing conversation',()=>{
  const f=withProfile(),idx=f.gas.loadIndex_(f.gas.config_());
  f.gas.saveConversation_('user-1',idx.fingerprint,{question:'先前詢問的作品',focus:idx.imageSources[0].imageKey},[idx.imageSources[0].imageKey],Date.now());
  const cases=['首頁','選單','回首頁','履歷首頁','home','menu','nav:home'];
@@ -89,7 +89,7 @@ test('home aliases and the persistent card button can reopen all three cards rep
   const e=label==='nav:home'?{...event('',String(i)),type:'postback',postback:{data:label}}:event(label,String(i));
   f.gas.handleEvent_(e,f.gas.config_());
   const calls=f.state.calls.slice(before),home=calls.find(c=>c.url.endsWith('/message/reply')).body.messages[0];
-  assert.equal(home.contents.contents.length,3);assert.equal(home.contents.contents[2].footer.contents[0].action.data,'nav:home');
+  assert.equal(home.contents.contents.length,3);assert.equal(home.contents.contents[2].footer.contents[0].action.data,'jg:resume');
   assert(!calls.some(c=>c.url.includes('generativelanguage')));
  }
  assert.equal(f.state.documentWrites,0);

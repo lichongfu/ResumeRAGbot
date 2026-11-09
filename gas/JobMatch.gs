@@ -26,7 +26,7 @@ function jobInterviewActions_(user, cfg) {
   return actions;
 }
 function jobHomeActions_(user, cfg) {
-  return [contactButton_('我的職缺與訪談', 'jg:resume')];
+  return [contactButton_('我的職缺與訪談', 'jg:resume'), contactButton_('招募工作台', 'rc:menu'), contactButton_('預約面談', 'slot:list')];
 }
 
 function jobMessage_(text, actions) {

@@ -129,10 +129,13 @@ function welcomeMessage_(cfg, prepared, userId) {
   }
   function action(topic) { return { type: 'postback', label: topic.label, data: 'topic:' + topic.id, displayText: topic.label }; }
   function card(number, title, contents, footer) {
+    footer.forEach(function (button) {
+      if (button.type === 'button') { button.style = button.action.data === 'jg:start' ? 'primary' : 'link'; button.color = '#23735B'; }
+    });
     return { type: 'bubble', size: 'kilo', header: { type: 'box', layout: 'horizontal', paddingAll: '16px', backgroundColor: '#143D35', contents: [
       text(title, 'xs', '#FFFFFF', true), { type: 'text', text: number + ' / 03', align: 'end', size: 'xxs', color: '#B7D8C9', flex: 0 }
     ] }, body: { type: 'box', layout: 'vertical', paddingAll: '18px', spacing: 'md', height: '300px', backgroundColor: '#FAFBF8', contents: contents },
-      footer: { type: 'box', layout: 'vertical', paddingAll: '12px', backgroundColor: '#FAFBF8', contents: footer } };
+      footer: { type: 'box', layout: 'vertical', height: '184px', justifyContent: 'flex-end', spacing: 'xs', paddingAll: '12px', backgroundColor: '#FAFBF8', contents: footer } };
   }
   var identity = [portrait ? { type: 'box', layout: 'vertical', width: '80px', height: '80px', cornerRadius: '40px', alignItems: 'center', contents: [
     { type: 'image', url: portrait.imageUrl, size: 'full', aspectRatio: '1:1', aspectMode: 'cover' }
@@ -162,7 +165,7 @@ function welcomeMessage_(cfg, prepared, userId) {
     card('01', 'HELLO / 認識我', identity, [contactButton_('看履歷', 'topic:' + buttons[1].id),
       contactButton_('貼職缺', 'jg:start'), contactButton_('聯繫邀約', 'nav:contact')]),
     card('02', 'ABOUT / 個人特質', traits, [compactButton(buttons[1])]),
-    card('03', 'EXPLORE / 履歷導覽', navigation, [{ type: 'button', height: 'sm', style: 'link', color: '#23735B', action: { type: 'postback', label: '回首頁', data: 'nav:home', displayText: '首頁' } }].concat(jobHomeActions_(userId, cfg)))
+    card('03', 'EXPLORE / 履歷導覽', navigation, jobHomeActions_(userId, cfg))
   ] } };
 }
 
@@ -170,14 +173,14 @@ function welcomeMessage_(cfg, prepared, userId) {
  * 訪客輸入「使用說明」時顯示的操作方法。
  */
 function helpText_() {
-  return "從「首頁」開始：\n• 看履歷：概覽經歷、技能與作品，也能自由提問。\n• 貼職缺：貼完整職缺 → 確認條件 → AI 比對並問三題 → 確認回答 → 查看整合結果。\n• 聯繫邀約：查看聯絡方式或留下邀約，確認後才送出。\n\n「我的職缺與訪談」會回到同一份職缺的原步驟，不需要切換角色，也不需重貼。三題由 AI 依職缺與履歷缺口生成，一次問一題；可略過、暫停或修改。確認後再產生正式面試的深入追問。\n\n輸入「取消」會暫停並保留職缺；刪除請到「職缺設定」。更換職缺前會再次確認。舊版的「待回答職缺」及角色按鈕會帶回目前職缺。\n\n作品可接續追問，短期記憶約 10 分鐘；輸入「清除對話」可重設。輸入「隱私」查看資料用途。";
+  return "從「首頁」開始：\n• 看履歷：概覽經歷、技能與作品，也能自由提問。\n• 貼職缺：貼完整職缺 → 確認條件 → AI 比對並問三題 → 確認回答 → 查看整合結果。\n• 聯繫邀約：查看聯絡方式或留下邀約，確認後才送出。\n\n人資也可進入「招募工作台」貼多份已獲授權的履歷，查看熱圖、原文與資料覆蓋排序；數字不是能力分數。\n輸入「預約面談」選時段，本人可輸入「管理面談時段」設定。邀約會預填職缺摘要，確認後才送出。\n\n「我的職缺與訪談」會回到同一份職缺的原步驟，不需要切換角色，也不需重貼。三題由 AI 依職缺與履歷缺口生成，一次問一題；可略過、暫停或修改。確認後再產生正式面試的深入追問。\n\n輸入「取消」會暫停並保留職缺；刪除請到「職缺設定」。更換職缺前會再次確認。舊版的「待回答職缺」及角色按鈕會帶回目前職缺。\n\n作品可接續追問，短期記憶約 10 分鐘；輸入「清除對話」可重設。輸入「隱私」查看資料用途。";
 }
 
 /**
  * 向訪客說明提問、短期記憶與待補充問題的資料使用方式。
  */
 function privacyText_() {
-  return "我是 AI 履歷助理，重要資訊請向本人查證。\n\n資料使用方式：\n• 職缺流程：職缺及少量公開履歷片段交由 Gemini 比對與出題。每題回答先存於私人準備單；三題完成、確認送出後，才交給 Gemini 產生正式面試追問。回答標示為填寫者補充，不自動變成履歷事實，不寫回 Doc 或索引，不自動分享、寄信或推播。\n• 各訪客以專案及 Doc 綁定的雜湊隔離，私人 Drive 保存 24 小時；到期後不可查閱，後續使用時清理，沒有背景清理排程。回首頁或取消是暫停；職缺設定中可確認刪除。已傳出的 LINE 訊息或自行複製的內容無法收回。\n• 舊版訪談資料保留於原私人資料檔，不自動轉成新證據；只有有權限的帳號可沿用尚未過期的職缺。\n• 邀約表單不交給 AI，確認後才保存至私人收件匣，並依設定以 Email、LINE 通知本人。\n• 一般問答只用公開區內容，提問與檢索片段會送至 Gemini；找不到答案時可能將問題寫入 Doc 的待補充區，不附訪客 LINE ID。\n• 作品預覽只用本人已開放的獨立圖片副本。短期對話記憶約 10 分鐘，事件以雜湊去重；不保存訪客原始 LINE ID，主人通知則使用已設定的 OWNER_LINE_USER_ID。\n\n請勿傳送密碼、證件或機密資料。LINE 與 Google 仍適用各自資料政策。";
+  return "我是 AI 履歷助理，重要資訊請向本人查證。\n\n資料使用方式：\n• 招募工作台的候選文字會交給 Gemini 找引文，與職缺一起到期（最長 24 小時）。一般 LINE 訪客彼此隔離；檔案實際在 bot 主人的 Drive，持有人仍可讀取。人工決定與理由不送 AI。\n• 面談時段選擇先暫留五分鐘，確認邀約後才登記預約。僅管理本 bot，不同步外部行事曆；預約在結束三十天後於後續操作時清理。取消預約不自動寄取消通知。\n• 職缺流程：職缺及少量公開履歷片段交由 Gemini 比對與出題。每題回答先存於私人準備單；三題完成、確認送出後，才交給 Gemini 產生正式面試追問。回答標示為填寫者補充，不自動變成履歷事實，不寫回 Doc 或索引，不自動分享、寄信或推播。\n• 各訪客以專案及 Doc 綁定的雜湊隔離，私人 Drive 保存 24 小時；到期後不可查閱，後續使用時清理，沒有背景清理排程。回首頁或取消是暫停；職缺設定中可確認刪除。已傳出的 LINE 訊息或自行複製的內容無法收回。\n• 舊版訪談資料保留於原私人資料檔，不自動轉成新證據；只有有權限的帳號可沿用尚未過期的職缺。\n• 邀約表單不交給 AI，確認後才保存至私人收件匣，並依設定以 Email、LINE 通知本人。\n• 一般問答只用公開區內容，提問與檢索片段會送至 Gemini；找不到答案時可能將問題寫入 Doc 的待補充區，不附訪客 LINE ID。\n• 作品預覽只用本人已開放的獨立圖片副本。短期對話記憶約 10 分鐘，事件以雜湊去重；不保存訪客原始 LINE ID，主人通知則使用已設定的 OWNER_LINE_USER_ID。\n\n請勿傳送密碼、證件或機密資料。LINE 與 Google 仍適用各自資料政策。";
 }
 
 /**

@@ -95,17 +95,21 @@ function invitationPrompt_(draft) {
     (draft.step === 0 ? '\n\n確認後才會存入履歷主人的私有邀約收件匣，並以 Email 與已設定的 LINE 通知本人；填寫內容不交給 AI。30 分鐘內可繼續，輸入「取消」可離開。' : ''));
   message.quickReply = { items: [{ type: 'action', action: { type: 'postback', label: '取消邀約', data: 'invite:cancel', displayText: '取消邀約' } }] };
   if (draft.step === 3) message.quickReply.items.unshift({ type: 'action', action: { type: 'postback', label: '略過時段', data: 'invite:skip:' + draft.id, displayText: '略過時段' } });
+  if (draft.step === 3) message.quickReply.items.unshift({ type: 'action', action: { type: 'postback', label: '選擇面談時段', data: 'slot:list', displayText: '選擇面談時段' } });
   return [message];
 }
 
 function invitationConfirmation_(draft) {
   var lines = INVITATION_FIELDS_.map(function (field) { return field.label + '：' + (draft.fields[field.key] || '不限定'); });
-  var summary = textMessage_('請確認邀約內容\n\n' + lines.join('\n\n') + '\n\n按「確認送出」後，以上資料會存入履歷主人的私有收件匣，並以 Email 與已設定的 LINE 通知本人。這不代表面試或合作已排定。');
+  var summary = textMessage_('請確認邀約內容\n\n' + lines.join('\n\n') +
+    (draft.context ? '\n\n職缺原文與對照摘要會隨邀約保存，Email 通知會附職缺原文。' : '') +
+    (draft.slotId ? '\n\n已暫留時段，確認時會再次檢查是否仍可預訂。' : '') + '\n\n按「確認送出」後，以上資料會存入履歷主人的私有收件匣，並以 Email 與已設定的 LINE 通知本人。這不代表面試或合作已排定。');
   delete summary.quickReply;
   return [summary, { type: 'flex', altText: '確認送出邀約，或重新填寫', contents: { type: 'bubble', size: 'kilo',
     body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '要送出這份邀約嗎？', weight: 'bold', wrap: true }] },
     footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [contactButton_('確認送出', 'invite:submit:' + draft.id),
-      contactButton_('重新填寫', 'invite:restart:' + draft.id), contactButton_('取消邀約', 'invite:cancel')] } } }];
+      contactButton_(draft.slotId ? '更換面談時段' : '選擇面談時段', 'slot:list'),
+      contactButton_('修改職缺與問題', 'invite:editmessage:' + draft.id), contactButton_('重新填寫', 'invite:restart:' + draft.id), contactButton_('取消邀約', 'invite:cancel')] } } }];
 }
 
 function invitationReceipt_(record) {
@@ -114,7 +118,8 @@ function invitationReceipt_(record) {
   var detail = status === 'sent' ? 'Email 通知已送交 Google 寄送，請等候本人透過您留下的方式回覆。' :
     lineSent ? 'LINE 通知已送交平台推播，請等候本人透過您留下的方式回覆。' :
     status && status !== 'test_skipped' ? 'Email 通知尚未確認寄出，您也可以使用「聯繫本人」中的 Email 直接聯絡。' : '供本人確認並透過您留下的方式回覆。';
-  return [textMessage_('邀約已存入履歷主人的私有收件匣。' + detail + '這不代表面試或合作已排定。')];
+  return [textMessage_('邀約已存入履歷主人的私有收件匣。' + detail +
+    (record.booking && record.booking.status === 'reserved' ? '所選時段已登記保留，請與本人確認面談細節；輸入「我的預約」可查詢或取消。' : record.booking ? '此邀約的時段預約已取消。' : '這不代表面試或合作已排定。'))];
 }
 
 /** 通知信附完整邀約，主人可直接閱讀；只使用純文字，不執行訪客提供的 HTML。 */
@@ -124,7 +129,7 @@ function invitationEmail_(record, recipient) {
     body: '有人透過您的履歷機器人留下邀約。\n\n' +
       INVITATION_FIELDS_.map(function (field) { return field.label + '：\n' + (fields[field.key] || '不限定'); }).join('\n\n') +
       '\n\n收到時間：' + Utilities.formatDate(new Date(record.createdAt), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss') + '（台北時間）' +
-      '\n邀約編號：' + record.id + '\n\n邀約已保存在您的私人收件匣。請依對方留下的回覆方式聯繫；系統沒有自動安排面試。' };
+      '\n邀約編號：' + record.id + (record.context ? '\n\n本次職缺原文：\n' + record.context.job : '') + '\n\n邀約已保存在您的私人收件匣。請依對方留下的回覆方式聯繫；預留時段仍需雙方確認面談細節。' };
   // Reply-To 只接受完整、單一的信箱；電話、LINE ID 或混合文字不當作郵件標頭。
   var replyTo = String(fields.replyTo || '').trim();
   if (usableEmail_(replyTo)) message.replyTo = replyTo;
@@ -182,9 +187,10 @@ function handleContact_(event, text, cfg, prepared, options) {
   var pendingKey = 'pending_' + key;
   if (/^(?:使用說明|說明|help|隱私|privacy)$/i.test(text)) return null;
   if (event.type === 'follow' || /^(?:首頁|選單|回首頁|履歷首頁|home|menu|開始|nav:home|清除對話|重新開始|reset)$/i.test(text) || /^(?:topic|work):/.test(text)) {
+    releaseInterviewHold_(event.source.userId, invitationDraft_(key), cfg, false);
     cache.remove(key); props.deleteProperty(pendingKey); return null;
   }
-  if (text === 'nav:contact') { cache.remove(key); props.deleteProperty(pendingKey); return [contactMessage_(cfg, prepared)]; }
+  if (text === 'nav:contact') { releaseInterviewHold_(event.source.userId, invitationDraft_(key), cfg, false); cache.remove(key); props.deleteProperty(pendingKey); return [contactMessage_(cfg, prepared)]; }
   // 回傳獨立純文字信箱，手機可長按、電腦可右鍵複製；不依賴 mailto 或剪貼簿動作的支援。
   if (text === 'contact:email' || /^(?:取得\s*Email|寄信地址)$/i.test(text)) {
     var contact;
@@ -204,13 +210,18 @@ function handleContact_(event, text, cfg, prepared, options) {
       return messages;
     }
     if (text === 'invite:cancel' || /^(?:取消|取消邀約)$/.test(text)) {
+      releaseInterviewHold_(event.source.userId, draft, cfg, true);
       cache.remove(key); props.deleteProperty(pendingKey); draft = null; return remember([textMessage_('已取消填寫，未送出新的邀約。')]);
     }
     if (text === 'invite:start' || text === '留下邀約' || draft && text === 'invite:restart:' + draft.id) {
+      var previous = draft && text === 'invite:restart:' + draft.id ? draft : null;
+      releaseInterviewHold_(event.source.userId, draft, cfg, true);
       draft = { id: sha256_(Utilities.getUuid()).slice(0, 32), step: 0, fields: {}, expiresAt: Date.now() + 1800000 };
+      if (previous && previous.context) { draft.context = previous.context; draft.fields.message = previous.fields.message; draft.prefilled = true; }
       props.setProperty(pendingKey, draft.id);
       return remember(invitationPrompt_(draft));
     }
+    if (draft && draft.step === 4 && text === 'invite:editmessage:' + draft.id) { draft.step = 1; draft.editReturn = 4; return remember(invitationPrompt_(draft)); }
     var submit = /^invite:submit:([a-f0-9]{32})$/.exec(text);
     if (submit) {
       var store = loadPortfolioStore_(cfg), records = store.invitations || {}, existing = records[submit[1]], visitor = invitationVisitor_(event.source.userId);
@@ -218,6 +229,11 @@ function handleContact_(event, text, cfg, prepared, options) {
       if (!draft || draft.id !== submit[1] || draft.step !== 4) return [textMessage_('這份確認已過期或已被新的草稿取代。請使用最新確認卡片，或重新選擇「留下邀約」。')];
       try {
         records[draft.id] = { id: draft.id, visitor: visitor, createdAt: new Date().toISOString(), status: 'new', fields: draft.fields };
+        if (!commitInterviewBooking_(store, draft, records[draft.id], event.source.userId)) {
+          delete draft.slotId; delete draft.fields.availability; draft.step = 3;
+          return remember([textMessage_('時段暫留已過期或不再可用，邀約尚未送出，請重新選擇時間。')].concat(invitationPrompt_(draft)));
+        }
+        if (draft.context) records[draft.id].context = draft.context;
         store.invitations = records;
         // 本函式已持鎖，不再次呼叫會取得同一把鎖的 updatePortfolioStore_。
         savePortfolioStore_(store, cfg);
@@ -236,6 +252,11 @@ function handleContact_(event, text, cfg, prepared, options) {
       else if (event.type !== 'message' || !text || /^invite:/.test(text)) return invitationPrompt_(draft);
       else if (text.length > field.limit) return [textMessage_('這一欄請控制在 ' + field.limit + ' 字內，再傳送一次。')];
       draft.fields[field.key] = value; draft.step++;
+      if (draft.editReturn === 4) { draft.step = 4; delete draft.editReturn; }
+      else {
+        if (draft.step === 1 && draft.prefilled && draft.fields.message) draft.step = 2;
+        if (draft.step === 3 && draft.slotId) draft.step = 4;
+      }
       return remember(draft.step === 4 ? invitationConfirmation_(draft) : invitationPrompt_(draft));
     }
     if (draft && draft.step === 4) return invitationConfirmation_(draft);
@@ -265,7 +286,10 @@ function updateInvitation(token, id, action) {
     if (!/^[a-f0-9]{32}$/.test(String(id)) || ['handled', 'new', 'delete'].indexOf(action) < 0) throw new Error('REVIEW_INVALID_INPUT');
     updatePortfolioStore_(cfg, function (store) {
       if (!store.invitations || !store.invitations[id]) return;
-      if (action === 'delete') delete store.invitations[id];
+      if (action === 'delete') {
+        if (store.invitations[id].booking && store.invitations[id].booking.status === 'reserved') throw new Error('此邀約仍有預約，請先取消預約再刪除。');
+        delete store.invitations[id];
+      }
       else store.invitations[id].status = action;
     });
     return { status: 'ok' };

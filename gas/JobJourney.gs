@@ -20,14 +20,15 @@ function journeyReview_(s) {
 }
 function journeyActions_(s) {
   if (s.stage === 'complete') return [['證據與作品', 'jg:evidence:' + s.id], ['三題回答', 'jg:answers:' + s.id],
-    ['面試追問', 'jg:questions:' + s.id], ['完整準備單', 'jg:report:' + s.id], ['留下邀約', 'jg:invite:' + s.id], ['職缺設定', 'jg:options:' + s.id]];
+    ['面試追問', 'jg:questions:' + s.id], ['完整準備單', 'jg:report:' + s.id], ['留下邀約', 'jg:invite:' + s.id],
+    ['招募工作台／需求熱圖', 'rc:menu'], ['預約面談', 'slot:list'], ['職缺設定', 'jg:options:' + s.id]];
   return [['繼續這份職缺', 'jg:resume'], ['回首頁', 'nav:home']];
 }
 function journeyPrompt_(s) {
   var interview = s.interview, question = interview.questions[interview.cursor], token = journeyToken_(s);
   return jobMessage_('職缺面試流程｜3 / 5 AI 訪談 ' + (interview.cursor + 1) + ' / 3\n' + s.job.split('\n')[0].slice(0, 70) +
     '\n\n' + question.text + '\n\n請直接回答，最多 800 字。可略過或稍後繼續。補充內容會標示為「' + interview.origin + '」，不直接變成履歷事實；三題完成後仍可修改並確認。',
-    [['略過這題', 'jg:skip:' + s.id + ':' + token], ['稍後繼續', 'jg:leave:' + s.id], ['查看相關證據', 'jg:evidence:' + s.id], ['職缺設定', 'jg:options:' + s.id]]);
+    [['略過這題', 'jg:skip:' + s.id + ':' + token], ['稍後繼續', 'jg:leave:' + s.id], ['查看相關證據', 'jg:evidence:' + s.id], ['人資：候選比較', 'rc:menu'], ['職缺設定', 'jg:options:' + s.id]]);
 }
 function journeyAnswersText_(s) {
   var interview = s.interview;
@@ -166,6 +167,7 @@ function journeyRun_(event, cfg, id, task, token) {
     if (s.busyUntil > Date.now()) return { busy: true };
     if (task === 'extract' && s.stage !== 'extract' || task === 'compare' && (!s.requirements || s.interview && s.fingerprint && ['interview', 'reviewAnswers', 'complete'].indexOf(s.stage) >= 0) ||
         task === 'finalize' && (s.stage !== 'reviewAnswers' || token !== journeyToken_(s))) return { unchanged: s };
+    if (task === 'compare') s.requirementsConfirmed = true;
     s.lease = lease; s.busyUntil = Date.now() + 90000; return JSON.parse(JSON.stringify(s));
   });
   if (!snapshot) return jobMessage_('這張舊卡片已失效，請開啟目前職缺。', [['我的職缺', 'jg:resume']]);
@@ -233,7 +235,7 @@ function handleJobGuide_(event, text, cfg) {
       row.events = (row.events || []).concat(row.inputEvents || []).filter(function (value, i, all) { return all.indexOf(value) === i; }).slice(-30);
       return row;
     });
-    if (!explicit && (!s || s.paused)) return null;
+    if (!explicit && (!s || s.paused && (s.events || []).indexOf(eventKey_(event)) < 0)) return null;
     var invitation = invitationDraft_(invitationKey_(user, cfg));
     if (invitation && invitation.step < 5) {
       if (command && command[1] === 'invite' && s && s.id === command[2]) return invitation.step < 4 ? invitationPrompt_(invitation) : invitationConfirmation_(invitation);
@@ -320,7 +322,7 @@ function handleJobGuide_(event, text, cfg) {
     if (command && command[1] === 'finalize') return journeyRun_(event, cfg, s.id, 'finalize', command[3]);
     if (command && command[1] === 'invite') {
       guideChange_(user, cfg, function (rows, actor) { rows[actor].paused = true; delete rows[actor].lease; delete rows[actor].busyUntil; });
-      return handleContact_(event, 'invite:start', cfg, null);
+      return startJobInvitation_(event, s, cfg);
     }
     if (command && ['answers', 'previous'].indexOf(command[1]) >= 0) {
       var interview = command[1] === 'previous' ? s.previousInterview : s.interview;
